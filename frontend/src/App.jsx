@@ -1,0 +1,185 @@
+/**
+ * App.jsx
+ * --------------------------------------------------
+ * Root application component for CycleLink.
+ *
+ * Architecture:
+ *   BrowserRouter → AuthProvider → App
+ *     ├── /                        → LandingPage       (public)
+ *     ├── /login                   → LoginPage         (public)
+ *     ├── /dashboard               → CyclistDashboard  ─┐
+ *     │   ├── /dashboard/map       → MapPage            │
+ *     │   ├── /dashboard/rewards   → RewardsPage        ├ DashboardLayout (nested)
+ *     │   ├── /dashboard/leaderboard → LeaderboardPage  │
+ *     │   └── /dashboard/history   → TripHistoryPage   ─┘
+ *     ├── /partner-dashboard       → PartnerDashboard   (DashboardLayout)
+ *     ├── /admin-panel             → AdminDashboard     (DashboardLayout)
+ *     └── *                        → redirect
+ *
+ * DashboardLayout uses <Outlet /> so the sidebar remains
+ * stable when navigating between sub-pages.
+ * --------------------------------------------------
+ */
+
+import { Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
+
+// Pages
+import LandingPage from "./pages/LandingPage";
+import LoginPage from "./pages/LoginPage";
+import CyclistDashboard from "./pages/CyclistDashboard";
+import MapPage from "./pages/MapPage";
+import RewardsPage from "./pages/RewardsPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
+import TripHistoryPage from "./pages/TripHistoryPage";
+import WeatherPage from "./pages/WeatherPage";
+import PartnerDashboard from "./pages/PartnerDashboard";
+import ShopProfile from "./pages/partner/ShopProfile";
+import EarningsPage from "./pages/partner/EarningsPage";
+import AdminDashboard from "./pages/AdminDashboard";
+import RedeemRewardsPage from "./pages/RedeemRewardsPage";
+import SavedRoutesPage from "./pages/SavedRoutesPage";
+
+// Components
+import ProtectedRoute from "./components/ProtectedRoute";
+import PageTransition from "./components/PageTransition";
+import Sidebar from "./components/Sidebar";
+import MobileBottomNav from "./components/MobileBottomNav";
+
+// Context & Hooks
+import SidebarProvider from "./context/SidebarContext";
+import useSidebar from "./hooks/useSidebar";
+import useAuth from "./hooks/useAuth";
+
+/**
+ * DashboardContent
+ * Must be inside SidebarProvider to read sidebarWidth.
+ * Uses <Outlet /> to render the matched child route.
+ */
+function DashboardContent() {
+  const { sidebarWidth } = useSidebar();
+
+  return (
+    <div
+      className="flex min-h-screen bg-slate-50"
+      style={{ "--sidebar-w": `${sidebarWidth}px` }}
+    >
+      {/* Desktop sidebar (hidden below md via its own CSS) */}
+      <Sidebar />
+
+      {/* Main content — left margin matches sidebar on md+, 0 on mobile */}
+      <main className="flex-1 min-w-0 transition-all duration-300 pb-20 md:pb-0 ml-0 md:ml-[var(--sidebar-w)]">
+        <Outlet />
+      </main>
+
+      {/* Mobile bottom nav (hidden above md via its own CSS) */}
+      <MobileBottomNav />
+    </div>
+  );
+}
+
+/**
+ * DashboardLayout
+ * Wraps SidebarProvider around the layout so both
+ * Sidebar and content margin share the collapsed state.
+ */
+function DashboardLayout() {
+  return (
+    <SidebarProvider>
+      <DashboardContent />
+    </SidebarProvider>
+  );
+}
+
+export default function App() {
+  const location = useLocation();
+  const { user } = useAuth();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        {/* ── Public routes ── */}
+        <Route
+          path="/"
+          element={
+            <PageTransition>
+              <LandingPage />
+            </PageTransition>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <PageTransition>
+              <LoginPage />
+            </PageTransition>
+          }
+        />
+
+        {/* ── Cyclist dashboard (nested routes) ── */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["cyclist"]}>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<CyclistDashboard />} />
+          <Route path="map" element={<MapPage />} />
+          <Route path="rewards" element={<RewardsPage />} />
+          <Route path="leaderboard" element={<LeaderboardPage />} />
+          <Route path="history" element={<TripHistoryPage />} />
+          <Route path="weather" element={<WeatherPage />} />
+          <Route path="redeem" element={<RedeemRewardsPage />} />
+          <Route path="routes" element={<SavedRoutesPage />} />
+        </Route>
+
+        {/* ── Partner dashboard ── */}
+        <Route
+          path="/partner-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["partner"]}>
+              <PageTransition>
+                <SidebarProvider>
+                  <DashboardContent />
+                </SidebarProvider>
+              </PageTransition>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<PartnerDashboard />} />
+          <Route path="shop-profile" element={<ShopProfile />} />
+          <Route path="earnings" element={<EarningsPage />} />
+        </Route>
+
+        {/* ── Admin panel ── */}
+        <Route
+          path="/admin-panel"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <PageTransition>
+                <SidebarProvider>
+                  <DashboardContent />
+                </SidebarProvider>
+              </PageTransition>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+        </Route>
+
+        {/* ── Catch-all ── */}
+        <Route
+          path="*"
+          element={
+            <Navigate
+              to={user ? "/dashboard" : "/"}
+              replace
+            />
+          }
+        />
+      </Routes>
+    </AnimatePresence>
+  );
+}
