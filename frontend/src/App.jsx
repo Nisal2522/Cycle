@@ -37,8 +37,13 @@ import PartnerDashboard from "./pages/PartnerDashboard";
 import ShopProfile from "./pages/partner/ShopProfile";
 import EarningsPage from "./pages/partner/EarningsPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminRouteOverviewPage from "./pages/AdminRouteOverviewPage";
 import RedeemRewardsPage from "./pages/RedeemRewardsPage";
 import SavedRoutesPage from "./pages/SavedRoutesPage";
+import PaymentPage from "./pages/PaymentPage";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancel from "./pages/PaymentCancel";
+import ChatPage from "./pages/ChatPage";
 
 // Components
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -48,6 +53,7 @@ import MobileBottomNav from "./components/MobileBottomNav";
 
 // Context & Hooks
 import SidebarProvider from "./context/SidebarContext";
+import ChatUnreadProvider from "./context/ChatUnreadContext";
 import useSidebar from "./hooks/useSidebar";
 import useAuth from "./hooks/useAuth";
 
@@ -61,14 +67,14 @@ function DashboardContent() {
 
   return (
     <div
-      className="flex min-h-screen bg-slate-50"
+      className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50"
       style={{ "--sidebar-w": `${sidebarWidth}px` }}
     >
       {/* Desktop sidebar (hidden below md via its own CSS) */}
       <Sidebar />
 
       {/* Main content — left margin matches sidebar on md+, 0 on mobile */}
-      <main className="flex-1 min-w-0 transition-all duration-300 pb-20 md:pb-0 ml-0 md:ml-[var(--sidebar-w)]">
+      <main className="flex-1 min-w-0 max-w-full overflow-x-hidden transition-all duration-300 pb-20 md:pb-0 ml-0 md:ml-[var(--sidebar-w)]">
         <Outlet />
       </main>
 
@@ -86,7 +92,9 @@ function DashboardContent() {
 function DashboardLayout() {
   return (
     <SidebarProvider>
-      <DashboardContent />
+      <ChatUnreadProvider>
+        <DashboardContent />
+      </ChatUnreadProvider>
     </SidebarProvider>
   );
 }
@@ -133,6 +141,10 @@ export default function App() {
           <Route path="weather" element={<WeatherPage />} />
           <Route path="redeem" element={<RedeemRewardsPage />} />
           <Route path="routes" element={<SavedRoutesPage />} />
+          <Route path="payment" element={<PaymentPage />} />
+          <Route path="payment/success" element={<PaymentSuccess />} />
+          <Route path="payment/cancel" element={<PaymentCancel />} />
+          <Route path="messages" element={<ChatPage />} />
         </Route>
 
         {/* ── Partner dashboard ── */}
@@ -142,7 +154,9 @@ export default function App() {
             <ProtectedRoute allowedRoles={["partner"]}>
               <PageTransition>
                 <SidebarProvider>
-                  <DashboardContent />
+                  <ChatUnreadProvider>
+                    <DashboardContent />
+                  </ChatUnreadProvider>
                 </SidebarProvider>
               </PageTransition>
             </ProtectedRoute>
@@ -151,6 +165,7 @@ export default function App() {
           <Route index element={<PartnerDashboard />} />
           <Route path="shop-profile" element={<ShopProfile />} />
           <Route path="earnings" element={<EarningsPage />} />
+          <Route path="messages" element={<ChatPage />} />
         </Route>
 
         {/* ── Admin panel ── */}
@@ -160,13 +175,17 @@ export default function App() {
             <ProtectedRoute allowedRoles={["admin"]}>
               <PageTransition>
                 <SidebarProvider>
-                  <DashboardContent />
+                  <ChatUnreadProvider>
+                    <DashboardContent />
+                  </ChatUnreadProvider>
                 </SidebarProvider>
               </PageTransition>
             </ProtectedRoute>
           }
         >
           <Route index element={<AdminDashboard />} />
+          <Route path="route-overview" element={<AdminRouteOverviewPage />} />
+          <Route path="messages" element={<ChatPage />} />
         </Route>
 
         {/* ── Catch-all ── */}

@@ -25,7 +25,7 @@
  */
 
 import { createContext, useState, useEffect, useCallback } from "react";
-import { registerUser, loginUser, googleLogin as googleLoginApi } from "../services/authService";
+import { registerUser, loginUser, googleLogin as googleLoginApi, updateProfile as updateProfileApi, uploadAvatar as uploadAvatarApi } from "../services/authService";
 
 // Keys used for localStorage persistence
 const STORAGE_KEYS = {
@@ -71,6 +71,7 @@ export default function AuthProvider({ children }) {
       role: data.role || "cyclist",
       shopName: data.shopName || null,
       shopImage: data.shopImage ?? data.shopImageUrl ?? "",
+      profileImage: data.profileImage ?? "",
       partnerTotalRedemptions: data.partnerTotalRedemptions || 0,
     };
 
@@ -171,7 +172,7 @@ export default function AuthProvider({ children }) {
   const clearError = useCallback(() => setError(""), []);
 
   /**
-   * Update user in state and localStorage (e.g. after shop profile edit).
+   * Update user in state and localStorage (e.g. after shop profile edit or avatar upload).
    */
   const updateUser = useCallback((partial) => {
     setUser((prev) => {
@@ -181,6 +182,24 @@ export default function AuthProvider({ children }) {
       return next;
     });
   }, []);
+
+  /**
+   * Upload profile image and update user in state.
+   * @param {string} base64DataUri — data:image/...;base64,...
+   */
+  const uploadProfileImage = useCallback(
+    async (base64DataUri) => {
+      if (!token) return null;
+      const data = await uploadAvatarApi(token, base64DataUri);
+      const url = data?.url || data?.profileImage;
+      if (url) {
+        updateUser({ profileImage: url });
+        return url;
+      }
+      return null;
+    },
+    [token, updateUser]
+  );
 
   // Context value
   const value = {
@@ -194,6 +213,8 @@ export default function AuthProvider({ children }) {
     logout,
     clearError,
     updateUser,
+    updateProfile: updateProfileApi,
+    uploadProfileImage,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

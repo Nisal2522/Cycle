@@ -81,8 +81,8 @@ export default function LeaderboardPage() {
   const totalTokens = leaders.reduce((sum, e) => sum + e.tokens, 0);
 
   return (
-    <div className="min-h-[100dvh] md:min-h-screen">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* ── Header ── */}
         <motion.div
           custom={0}

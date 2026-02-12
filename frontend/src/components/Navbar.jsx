@@ -63,6 +63,21 @@ export default function Navbar() {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  // Lock body scroll when mobile menu is open (prevents background scroll)
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    };
+  }, [mobileOpen]);
+
   // Get user-specific data: role links only (no Landing Page / Settings in navbar)
   const userInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
   const allNavLinks = user ? getNavLinksForRole(user.role) : null;
@@ -84,20 +99,20 @@ export default function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 w-full max-w-full safe-area-top transition-all duration-300 ${
         scrolled
-          ? "bg-white/70 backdrop-blur-xl shadow-lg shadow-black/5 border-b border-white/20"
+          ? "bg-white/85 backdrop-blur-xl shadow-md border-b border-slate-200/50"
           : "bg-transparent"
       }`}
     >
-      <nav className="relative max-w-7xl mx-auto flex items-center justify-between px-5 sm:px-8 h-16 md:h-18">
+      <nav className="relative w-full max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 md:px-8 h-14 sm:h-16 min-w-0">
         {/* ── Left: Logo + Nav links ── */}
-        <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center gap-2 group shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-shadow">
-              <Bike className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+          <Link to="/" className="flex items-center gap-1.5 sm:gap-2 group shrink-0 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-shadow shrink-0">
+              <Bike className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <span className="text-xl font-extrabold tracking-tight text-slate-900">
+            <span className="text-base sm:text-xl font-extrabold tracking-tight text-slate-900 truncate">
               Cycle<span className="text-primary">Link</span>
             </span>
           </Link>
@@ -187,46 +202,48 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* ── Mobile menu toggle ── */}
+        {/* ── Mobile menu toggle (touch-friendly) ── */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden p-2 rounded-lg text-slate-700 hover:bg-slate-100 transition"
-          aria-label="Toggle menu"
+          className="md:hidden p-3 -mr-1 rounded-xl text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-colors touch-manipulation"
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
         >
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </nav>
 
-      {/* ── Mobile dropdown ── */}
+      {/* ── Mobile dropdown (scrollable if many items) ── */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden overflow-hidden bg-white/90 backdrop-blur-xl border-b border-slate-200"
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="md:hidden overflow-hidden bg-white border-b border-slate-200 shadow-lg"
           >
-            <div className="px-5 pb-5 pt-2 flex flex-col gap-1">
+            <div className="px-4 pt-2 pb-4 safe-area-bottom flex flex-col gap-0.5 max-h-[70vh] overflow-y-auto overscroll-contain">
               {user && navLinks ? (
                 <>
                   {/* Role badge */}
-                  <div className="flex items-center gap-2 py-2 mb-1">
-                    <Shield className="w-4 h-4 text-primary" />
+                  <div className="flex items-center gap-2 py-2 pb-1">
+                    <Shield className="w-4 h-4 text-primary shrink-0" />
                     <span className="text-xs font-semibold uppercase tracking-wider text-primary">
                       {roleLabel}
                     </span>
                   </div>
 
-                  {/* Role-specific links */}
+                  {/* Role-specific links (touch-friendly) */}
                   {navLinks.map((link) => (
                     <Link
                       key={link.label}
                       to={link.to}
                       onClick={() => setMobileOpen(false)}
-                      className={`inline-flex items-center px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                      className={`inline-flex items-center px-3 py-3 rounded-xl text-sm font-medium whitespace-nowrap transition-all touch-manipulation min-h-[44px] ${
                         isActive(link.to)
                           ? "text-primary bg-primary/10"
-                          : "text-slate-700 hover:text-primary hover:bg-primary/5"
+                          : "text-slate-700 hover:text-primary hover:bg-primary/5 active:bg-primary/10"
                       }`}
                     >
                       {link.label}
@@ -235,17 +252,17 @@ export default function Navbar() {
 
                   <hr className="my-2 border-slate-100" />
 
-                  {/* User info + logout */}
-                  <div className="flex items-center gap-2.5 py-2">
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
+                  {/* User info + logout (touch-friendly) */}
+                  <div className="flex items-center gap-3 py-2">
+                    <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
                       {userInitial}
                     </div>
-                    <span className="text-sm font-medium text-slate-700">{user.name}</span>
+                    <span className="text-sm font-medium text-slate-700 truncate">{user.name}</span>
                   </div>
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                    className="flex items-center gap-2 px-3 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 active:bg-red-100 transition-colors touch-manipulation min-h-[44px] w-full"
                   >
                     <LogOut className="w-4 h-4" />
                     Log Out
@@ -260,7 +277,7 @@ export default function Navbar() {
                         key={link.href}
                         href={link.href}
                         onClick={() => setMobileOpen(false)}
-                        className="text-sm font-medium text-slate-700 hover:text-primary px-3 py-2.5 rounded-lg hover:bg-primary/5 transition-all"
+                        className="text-sm font-medium text-slate-700 hover:text-primary px-3 py-3 rounded-xl hover:bg-primary/5 active:bg-primary/10 transition-all touch-manipulation min-h-[44px] flex items-center"
                       >
                         {link.label}
                       </a>
@@ -270,14 +287,14 @@ export default function Navbar() {
 
                   <Link
                     to="/login?mode=signin"
-                    className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-slate-700 hover:text-primary rounded-lg hover:bg-primary/5 transition-all"
+                    className="flex items-center gap-2 px-3 py-3 text-sm font-medium text-slate-700 hover:text-primary rounded-xl hover:bg-primary/5 active:bg-primary/10 transition-all touch-manipulation min-h-[44px]"
                   >
                     <LogIn className="w-4 h-4" />
                     Sign In
                   </Link>
                   <Link
                     to="/login?mode=signup"
-                    className="mt-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-primary text-white text-sm font-semibold shadow-lg shadow-primary/30 transition-all"
+                    className="mt-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-white text-sm font-semibold shadow-lg shadow-primary/30 active:scale-[0.98] transition-all touch-manipulation min-h-[44px]"
                   >
                     Get Started <ArrowRight className="w-4 h-4" />
                   </Link>

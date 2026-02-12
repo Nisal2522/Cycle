@@ -203,8 +203,8 @@ export default function RedeemRewardsPage() {
     });
 
   return (
-    <div className="min-h-[100dvh] md:min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* ── Header ── */}
         <motion.div
           custom={0}

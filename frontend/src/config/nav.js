@@ -1,12 +1,19 @@
 /**
  * config/nav.js
  * --------------------------------------------------
- * Shared navigation config for Sidebar and Navbar.
- * Single source of truth so navbar shows the same items as sidebar.
+ * Centralised navigation config for Navbar and Sidebar.
+ *
+ * Exports:
+ *   - getNavLinksForRole(role) → [{ label, to }] for navbar
+ *   - ROLE_NAV → { cyclist, partner, admin } each [{ to, label, icon }]
+ *   - SHARED_NAV → [{ to, label, icon }] e.g. Home, Settings
+ * --------------------------------------------------
  */
 
 import {
   Home,
+  Settings,
+  Bike,
   Map,
   MapPin,
   Award,
@@ -20,45 +27,64 @@ import {
   ShieldCheck,
   Users,
   Activity,
-  Settings,
+  MessageCircle,
 } from "lucide-react";
 
-/** Role-specific navigation (same as sidebar) */
-export const ROLE_NAV = {
+/* ── Navbar: role-specific links (label + to only) ── */
+const NAV_LINKS_BY_ROLE = {
   cyclist: [
-    { label: "Overview", to: "/dashboard", icon: Home },
-    { label: "Map (Routes)", to: "/dashboard/routes", icon: Map },
-    { label: "Live Map", to: "/dashboard/map", icon: MapPin },
-    { label: "My Rewards", to: "/dashboard/rewards", icon: Award },
-    { label: "Trip History", to: "/dashboard/history", icon: Clock },
-    { label: "Leaderboard", to: "/dashboard/leaderboard", icon: Trophy },
-    { label: "Weather", to: "/dashboard/weather", icon: CloudSun },
+    { label: "Dashboard", to: "/dashboard" },
+    { label: "My Tokens", to: "/dashboard/rewards" },
+    { label: "Safe Routes", to: "/dashboard/map" },
+    { label: "Messages", to: "/dashboard/messages" },
   ],
   partner: [
-    { label: "Overview", to: "/partner-dashboard", icon: Home },
-    { label: "Shop Profile", to: "/partner-dashboard/shop-profile", icon: Store },
-    { label: "Redemption Scanner", to: "/partner-dashboard", icon: QrCode },
-    { label: "Earnings", to: "/partner-dashboard/earnings", icon: DollarSign },
-    { label: "Promo Manager", to: "/partner-dashboard", icon: Megaphone },
+    { label: "Dashboard", to: "/partner-dashboard" },
+    { label: "Scan QR", to: "/partner-dashboard" },
+    { label: "Earnings", to: "/partner-dashboard/earnings" },
+    { label: "Messages", to: "/partner-dashboard/messages" },
   ],
   admin: [
-    { label: "Dashboard", to: "/admin-panel", icon: ShieldCheck },
-    { label: "User Management", to: "/admin-panel", icon: Users },
-    { label: "Route Moderation", to: "/admin-panel", icon: Activity },
-    { label: "Payout Management", to: "/admin-panel", icon: DollarSign },
+    { label: "Dashboard", to: "/admin-panel" },
+    { label: "Users", to: "/admin-panel" },
+    { label: "Route Overview", to: "/admin-panel/route-overview" },
+    { label: "Messages", to: "/admin-panel/messages" },
   ],
 };
 
-/** Shared links (Landing Page, Settings) */
-export const SHARED_NAV = [
-  { label: "Landing Page", to: "/", icon: Home },
-  { label: "Settings", to: "/settings", icon: Settings },
-];
-
-/**
- * Get nav items to show in navbar when user is logged in (sidebar items).
- */
 export function getNavLinksForRole(role) {
-  const roleLinks = ROLE_NAV[role] || ROLE_NAV.cyclist;
-  return [...roleLinks, ...SHARED_NAV];
+  return NAV_LINKS_BY_ROLE[role] || NAV_LINKS_BY_ROLE.cyclist;
 }
+
+/* ── Sidebar: role-specific links with icons ── */
+export const ROLE_NAV = {
+  cyclist: [
+    { to: "/dashboard", label: "Overview", icon: Bike },
+    { to: "/dashboard/map", label: "Map", icon: Map },
+    { to: "/dashboard/routes", label: "Saved Routes", icon: MapPin },
+    { to: "/dashboard/rewards", label: "Rewards", icon: Award },
+    { to: "/dashboard/messages", label: "Messages", icon: MessageCircle },
+    { to: "/dashboard/history", label: "History", icon: Clock },
+    { to: "/dashboard/leaderboard", label: "Leaderboard", icon: Trophy },
+    { to: "/dashboard/weather", label: "Weather", icon: CloudSun },
+  ],
+  partner: [
+    { to: "/partner-dashboard", label: "Shop", icon: Store },
+    { to: "/partner-dashboard", label: "Scan QR", icon: QrCode },
+    { to: "/partner-dashboard/earnings", label: "Earnings", icon: DollarSign },
+    { to: "/partner-dashboard/messages", label: "Messages", icon: MessageCircle },
+    { to: "/partner-dashboard", label: "Promos", icon: Megaphone },
+  ],
+  admin: [
+    { to: "/admin-panel", label: "Dashboard", icon: ShieldCheck },
+    { to: "/admin-panel", label: "Users", icon: Users },
+    { to: "/admin-panel/route-overview", label: "Route Overview", icon: Activity },
+    { to: "/admin-panel/messages", label: "Messages", icon: MessageCircle },
+  ],
+};
+
+/* ── Sidebar: shared links (Home, Settings) ── */
+export const SHARED_NAV = [
+  { to: "/", label: "Home", icon: Home },
+  { to: "/settings", label: "Settings", icon: Settings },
+];

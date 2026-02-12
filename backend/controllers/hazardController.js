@@ -11,7 +11,7 @@
  * --------------------------------------------------
  */
 
-import Hazard from "../models/Hazard.js";
+import Hazard, { HAZARD_TYPES } from "../models/Hazard.js";
 
 /**
  * @desc    Get all active hazard markers
@@ -46,11 +46,13 @@ export async function getHazardMarkers(req, res) {
 
 /**
  * @desc    Report a new hazard at given coordinates
- * @body    { lat, lng, type?, description? }
+ * @body    { lat, lng, type?|category?, description? } — use 'type' or 'category' for hazard kind
  * @access  Private
  */
 export async function reportHazard(req, res) {
-  const { lat, lng, type, description } = req.body;
+  const { lat, lng } = req.body;
+  const type = (req.body.type ?? req.body.category ?? "other").toString().trim() || "other";
+  const description = (req.body.description != null ? String(req.body.description) : "").trim();
 
   if (lat == null || lng == null) {
     res.status(400);
@@ -62,11 +64,13 @@ export async function reportHazard(req, res) {
     throw new Error("Invalid coordinates");
   }
 
+  const safeType = HAZARD_TYPES.includes(type) ? type : "other";
+
   const hazard = await Hazard.create({
-    lat,
-    lng,
-    type: type || "other",
-    description: description || "",
+    lat: Number(lat),
+    lng: Number(lng),
+    type: safeType,
+    description,
     reportedBy: req.user._id,
   });
 

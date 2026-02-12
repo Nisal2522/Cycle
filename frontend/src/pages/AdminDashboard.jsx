@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Chart as ChartJS,
@@ -36,7 +37,10 @@ import {
   ChevronRight,
   DollarSign,
   Calendar,
+  Check,
+  X,
 } from "lucide-react";
+import RoutePreviewModal from "../components/RoutePreviewModal";
 import useAuth from "../hooks/useAuth";
 import {
   getAdminStats,
@@ -46,10 +50,16 @@ import {
   blockUser,
   deleteUser,
   getAdminRoutes,
+  getPendingRoutes,
+  approveRoute,
+  rejectRoute,
   deleteAdminRoute,
   getAdminPayouts,
+  getAdminPayments,
   calculatePayouts,
   processPayout,
+  getPayoutRequests,
+  approvePayoutRequest,
 } from "../services/adminService";
 
 ChartJS.register(
@@ -80,27 +90,60 @@ const TABS = [
   { id: "payouts", label: "Payout Management", icon: DollarSign },
 ];
 
+const VALID_TABS = ["overview", "users", "routes", "payouts"];
+
 export default function AdminDashboard() {
   const { user, token } = useAuth();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(() =>
+    tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : "overview"
+  );
+
+  // Default tab in URL so sidebar highlights correctly
+  useEffect(() => {
+    if (!tabFromUrl || !VALID_TABS.includes(tabFromUrl)) {
+      setSearchParams({ tab: "overview" }, { replace: true });
+    }
+  }, []);
+  // Sync tab from URL when user clicks sidebar (e.g. /admin-panel?tab=users)
+  useEffect(() => {
+    if (tabFromUrl && VALID_TABS.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+
+  const setTab = (id) => {
+    setActiveTab(id);
+    setSearchParams({ tab: id });
+  };
 
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [pendingRoutes, setPendingRoutes] = useState([]);
+  const [previewRoute, setPreviewRoute] = useState(null);
   const [payouts, setPayouts] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [payoutRequests, setPayoutRequests] = useState([]);
 
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
+  const [loadingPending, setLoadingPending] = useState(false);
   const [loadingPayouts, setLoadingPayouts] = useState(false);
+  const [loadingPayoutRequests, setLoadingPayoutRequests] = useState(false);
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   const [actioning, setActioning] = useState(null);
+  const [actioningRouteId, setActioningRouteId] = useState(null);
   const [payoutMonth, setPayoutMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
   const [calculating, setCalculating] = useState(false);
   const [processingPayoutId, setProcessingPayoutId] = useState(null);
+  const [processingRequestId, setProcessingRequestId] = useState(null);
   const [adminApi404, setAdminApi404] = useState(false);
   const [userRoleFilter, setUserRoleFilter] = useState("all"); // "all" | "cyclist" | "partner" | "admin"
   const [growthPeriod, setGrowthPeriod] = useState("thisYear"); // "thisYear" | "thisMonth"
@@ -154,24 +197,47 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (activeTab !== "routes" || !token) return;
     setLoadingRoutes(true);
-    getAdminRoutes(token)
-      .then(setRoutes)
+    setLoadingPending(true);
+    Promise.all([getAdminRoutes(token), getPendingRoutes(token)])
+      .then(([allRoutes, pending]) => {
+        setRoutes(Array.isArray(allRoutes) ? allRoutes : []);
+        setPendingRoutes(Array.isArray(pending) ? pending : []);
+      })
       .catch((err) => {
         const msg = err.response?.status === 401
           ? "Session expired or not authorized. Please sign in again."
           : err.response?.data?.message || "Failed to load routes";
         toast.error(msg);
       })
-      .finally(() => setLoadingRoutes(false));
+      .finally(() => {
+        setLoadingRoutes(false);
+        setLoadingPending(false);
+      });
   }, [activeTab, token]);
 
   useEffect(() => {
     if (activeTab === "payouts" && token) {
       setLoadingPayouts(true);
+      setLoadingPayments(true);
+      setLoadingPayoutRequests(true);
       getAdminPayouts(token)
         .then(setPayouts)
         .catch(() => toast.error("Failed to load payouts"))
         .finally(() => setLoadingPayouts(false));
+      getAdminPayments(token)
+        .then(setPayments)
+        .catch(() => toast.error("Failed to load payments"))
+        .finally(() => setLoadingPayments(false));
+      getPayoutRequests(token)
+        .then(setPayoutRequests)
+        .catch((err) => {
+          if (err.response?.status === 404) {
+            toast.error("Payout requests endpoint not found. Restart backend: cd backend && npm run dev", { duration: 6000 });
+          } else {
+            toast.error(err.response?.data?.message || "Failed to load payout requests");
+          }
+        })
+        .finally(() => setLoadingPayoutRequests(false));
     }
   }, [activeTab, token]);
 
@@ -221,11 +287,41 @@ export default function AdminDashboard() {
     try {
       await deleteAdminRoute(token, r._id);
       setRoutes((prev) => prev.filter((x) => x._id !== r._id));
+      setPendingRoutes((prev) => prev.filter((x) => x._id !== r._id));
       toast.success("Route deleted", { iconTheme: { primary: MAROON } });
     } catch (e) {
       toast.error(e.response?.data?.message || "Failed to delete");
     } finally {
       setActioning(null);
+    }
+  };
+
+  const handleApproveRoute = async (r) => {
+    setActioningRouteId(r._id);
+    try {
+      await approveRoute(token, r._id);
+      setPendingRoutes((prev) => prev.filter((x) => x._id !== r._id));
+      setRoutes((prev) => [...prev, { ...r, status: "approved" }]);
+      setPreviewRoute(null);
+      toast.success("Route approved — now visible on the map", { iconTheme: { primary: "#22c55e" } });
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to approve");
+    } finally {
+      setActioningRouteId(null);
+    }
+  };
+
+  const handleRejectRoute = async (r) => {
+    setActioningRouteId(r._id);
+    try {
+      await rejectRoute(token, r._id);
+      setPendingRoutes((prev) => prev.filter((x) => x._id !== r._id));
+      setPreviewRoute(null);
+      toast.success("Route rejected", { iconTheme: { primary: MAROON } });
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to reject");
+    } finally {
+      setActioningRouteId(null);
     }
   };
 
@@ -344,16 +440,15 @@ export default function AdminDashboard() {
     : null;
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+    <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-slate-50">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="mb-6">
-          <div className="flex items-center gap-2 text-sm font-medium" style={{ color: MAROON }}>
-            <ShieldCheck className="w-4 h-4" />
-            Super Admin
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-0.5">Admin Dashboard</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Manage users, routes, and partner payouts — <span className="font-medium text-slate-700">{user?.name}</span>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Welcome back,{" "}
+            <span style={{ color: MAROON }}>{user?.name || "Admin"}</span>
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-slate-500 text-xs sm:text-sm lg:text-base">
+            Manage users, routes, and partner payouts. Keep the platform safe and running.
           </p>
         </motion.div>
 
@@ -365,7 +460,7 @@ export default function AdminDashboard() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   activeTab === tab.id
                     ? "text-white shadow-md"
@@ -391,14 +486,17 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
               {loadingStats ? (
                 [...Array(4)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl p-5 border border-slate-100 animate-pulse h-28" />
+                  <div
+                    key={i}
+                    className="bg-white/90 backdrop-blur rounded-3xl p-5 border border-slate-100 animate-pulse h-32 shadow-[0_18px_45px_rgba(15,23,42,0.08)]"
+                  />
                 ))
               ) : (
                 [
-                  { icon: Users, label: "Total Users", value: stats?.totalUsers ?? 0, color: MAROON },
-                  { icon: Store, label: "Partners", value: stats?.totalPartners ?? 0, color: "#0ea5e9" },
-                  { icon: Route, label: "Saved Routes", value: stats?.totalRoutes ?? 0, color: "#22c55e" },
-                  { icon: AlertTriangle, label: "Reported Hazards", value: stats?.totalHazards ?? 0, color: "#f59e0b" },
+                  { icon: Users, label: "Total Users", value: stats?.totalUsers ?? 0, color: MAROON, bgLight: "rgba(128,19,77,0.08)" },
+                  { icon: Store, label: "Partners", value: stats?.totalPartners ?? 0, color: "#0ea5e9", bgLight: "rgba(14,165,233,0.08)" },
+                  { icon: Route, label: "Saved Routes", value: stats?.totalRoutes ?? 0, color: "#22c55e", bgLight: "rgba(34,197,94,0.08)" },
+                  { icon: AlertTriangle, label: "Reported Hazards", value: stats?.totalHazards ?? 0, color: "#f59e0b", bgLight: "rgba(245,158,11,0.08)" },
                 ].map((s, i) => (
                   <motion.div
                     key={s.label}
@@ -406,11 +504,35 @@ export default function AdminDashboard() {
                     variants={fadeIn}
                     initial="hidden"
                     animate="visible"
-                    className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    className="group relative bg-white/95 backdrop-blur rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] border border-slate-100/80 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] hover:border-slate-200 transition-all duration-300"
+                    style={{
+                      WebkitFontSmoothing: "antialiased",
+                    }}
                   >
-                    <s.icon className="w-6 h-6 mb-2" style={{ color: s.color }} />
-                    <p className="text-2xl font-bold text-slate-900">{s.value}</p>
-                    <p className="text-sm text-slate-500">{s.label}</p>
+                    {/* Colored top accent bar */}
+                    <div className="h-1.5 w-full" style={{ backgroundColor: s.color }} />
+                    <div className="p-4 sm:p-5">
+                      <div
+                        className="inline-flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl shadow-sm transition-transform duration-300 group-hover:scale-105"
+                        style={{
+                          backgroundColor: "#ffffff",
+                          color: s.color,
+                          boxShadow: "0 6px 18px rgba(15,23,42,0.12)",
+                        }}
+                      >
+                        <s.icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <p
+                        className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-4 tracking-tight"
+                        style={{ fontVariantNumeric: "tabular-nums" }}
+                      >
+                        {s.value}
+                      </p>
+                      <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5">
+                        {s.label}
+                      </p>
+                    </div>
                   </motion.div>
                 ))
               )}
@@ -554,7 +676,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-w-full">
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="text-left text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-200/80">
@@ -602,9 +724,6 @@ export default function AdminDashboard() {
                             <div>
                               <p className="font-semibold text-slate-800 tracking-tight">{u.name}</p>
                               <p className="text-xs text-slate-400 mt-0.5 font-medium">{u.email}</p>
-                              <span className="inline-flex items-center mt-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold font-mono truncate max-w-[200px] border shadow-sm" style={{ backgroundColor: `${MAROON}12`, borderColor: `${MAROON}40`, color: MAROON }} title={u._id}>
-                                ID: {u._id}
-                              </span>
                             </div>
                           </div>
                         </td>
@@ -712,51 +831,135 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
-        {/* Route Moderation — Community Routes */}
+        {/* Route Moderation — Pending Approvals + Community Routes */}
         {activeTab === "routes" && (
-          <motion.div
-            custom={0}
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            className="bg-white rounded-3xl overflow-hidden border border-slate-200/60"
-            style={{
-              boxShadow: "0 0 0 1px rgba(15,23,42,0.03), 0 2px 4px rgba(15,23,42,0.04), 0 12px 24px rgba(15,23,42,0.08)",
-            }}
-          >
-            <div
-              className="h-1.5 w-full"
-              style={{ background: `linear-gradient(90deg, ${MAROON} 0%, #a0155e 100%)` }}
-            />
-            <div
-              className="px-6 sm:px-8 py-6 border-b border-slate-100"
-              style={{ background: "linear-gradient(180deg, rgba(248,250,252,0.8) 0%, rgba(255,255,255,1) 100%)" }}
+          <>
+            {/* Pending Approvals table */}
+            <motion.div
+              custom={0}
+              variants={fadeIn}
+              initial="hidden"
+              animate="visible"
+              className="mb-6 bg-white rounded-3xl overflow-hidden border border-amber-200/80 shadow-md"
+              style={{ boxShadow: "0 0 0 1px rgba(245,158,11,0.1), 0 4px 16px rgba(15,23,42,0.06)" }}
             >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shrink-0"
-                    style={{
-                      background: `linear-gradient(135deg, ${MAROON} 0%, #a0155e 100%)`,
-                      boxShadow: `0 4px 12px ${MAROON}40`,
-                    }}
-                  >
-                    <Route className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-800 tracking-tight">Community Routes</h2>
-                    <p className="text-sm text-slate-500 mt-0.5">Review and moderate user-contributed routes</p>
-                  </div>
+              <div className="h-1.5 w-full bg-amber-500" />
+              <div className="px-6 sm:px-8 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Pending Approvals</h2>
+                  <p className="text-sm text-slate-500 mt-0.5">Approve or reject new routes so they appear on the map</p>
                 </div>
-                {loadingRoutes && (
+                {loadingPending && (
                   <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <Loader2 className="w-5 h-5 animate-spin" style={{ color: MAROON }} />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Loading…</span>
                   </div>
                 )}
               </div>
-            </div>
-            <div className="overflow-x-auto">
+              {pendingRoutes.length === 0 && !loadingPending ? (
+                <div className="px-6 py-8 text-center text-slate-500 text-sm">
+                  No pending routes. New routes will appear here for approval.
+                </div>
+              ) : (
+                <div className="overflow-x-auto max-w-full">
+                  <table className="w-full min-w-[600px]">
+                    <thead>
+                      <tr className="text-left text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-200/80">
+                        <th className="px-6 py-3 pl-8">Route</th>
+                        <th className="px-6 py-3">Creator</th>
+                        <th className="px-6 py-3">Distance</th>
+                        <th className="px-6 py-3 pr-8 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingRoutes.map((r) => (
+                        <tr key={r._id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 pl-8">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewRoute(r)}
+                              className="flex flex-col gap-1 max-w-xs text-left w-full rounded-lg hover:bg-amber-50/80 px-2 py-1 -mx-2 -my-1 transition-colors group"
+                            >
+                              <p className="text-sm font-medium text-slate-800 truncate group-hover:text-amber-800" title={r.startLocation}>{r.startLocation}</p>
+                              <p className="text-sm text-slate-600 truncate group-hover:text-amber-700" title={r.endLocation}>→ {r.endLocation}</p>
+                            </button>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-medium text-slate-700">{r.creatorId?.name || r.creatorId?.email || "—"}</p>
+                            {r.creatorId?.email && <p className="text-xs text-slate-400">{r.creatorId.email}</p>}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-600">{r.distance || "—"}</td>
+                          <td className="px-6 py-4 pr-8 text-right">
+                            <div className="flex items-center justify-end gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewRoute(r)}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+                                title="View route on map"
+                              >
+                                <Map className="w-4 h-4" />
+                                View on Map
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleApproveRoute(r)}
+                                disabled={actioningRouteId === r._id}
+                                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow-sm disabled:opacity-50 transition-all"
+                              >
+                                {actioningRouteId === r._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectRoute(r)}
+                                disabled={actioningRouteId === r._id}
+                                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 shadow-sm disabled:opacity-50 transition-all"
+                              >
+                                {actioningRouteId === r._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                                Reject
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Community Routes table */}
+            <motion.div
+              custom={0}
+              variants={fadeIn}
+              initial="hidden"
+              animate="visible"
+              className="bg-white rounded-3xl overflow-hidden border border-slate-200/60"
+              style={{
+                boxShadow: "0 0 0 1px rgba(15,23,42,0.03), 0 2px 4px rgba(15,23,42,0.04), 0 12px 24px rgba(15,23,42,0.08)",
+              }}
+            >
+              <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${MAROON} 0%, #a0155e 100%)` }} />
+              <div className="px-6 sm:px-8 py-6 border-b border-slate-100" style={{ background: "linear-gradient(180deg, rgba(248,250,252,0.8) 0%, rgba(255,255,255,1) 100%)" }}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shrink-0" style={{ background: `linear-gradient(135deg, ${MAROON} 0%, #a0155e 100%)`, boxShadow: `0 4px 12px ${MAROON}40` }}>
+                      <Route className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-800 tracking-tight">Community Routes</h2>
+                      <p className="text-sm text-slate-500 mt-0.5">Review and moderate user-contributed routes</p>
+                    </div>
+                  </div>
+                  {loadingRoutes && (
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <Loader2 className="w-5 h-5 animate-spin" style={{ color: MAROON }} />
+                      <span>Loading…</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="overflow-x-auto max-w-full">
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="text-left text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-200/80">
@@ -807,11 +1010,6 @@ export default function AdminDashboard() {
                           <p className={`font-semibold tracking-tight ${(r.creatorId?.name || r.creatorId?.email || r.creator?.name || r.creator?.email) ? "" : "text-slate-400 italic font-normal"}`} style={(r.creatorId?.name || r.creatorId?.email || r.creator?.name || r.creator?.email) ? { color: MAROON } : undefined}>
                             {(r.creatorId?.name || r.creatorId?.email || r.creator?.name || r.creator?.email) || "—"}
                           </p>
-                          {(r.creatorId?._id || r.creator?._id) && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold font-mono truncate max-w-[240px] border shadow-sm" style={{ backgroundColor: `${MAROON}12`, borderColor: `${MAROON}40`, color: MAROON }} title={String(r.creatorId?._id || r.creator?._id)}>
-                              ID: {String(r.creatorId?._id || r.creator?._id)}
-                            </span>
-                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -857,38 +1055,241 @@ export default function AdminDashboard() {
                 </p>
               </div>
             )}
-          </motion.div>
+            </motion.div>
+          </>
         )}
 
-        {/* Payout Management */}
+        {/* Payout Management — mobile responsive */}
         {activeTab === "payouts" && (
-          <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="space-y-4">
-            <div className="bg-white rounded-2xl p-4 border border-slate-100 flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-slate-700">Calculate payouts for month:</span>
-              <input
-                type="month"
-                value={payoutMonth}
-                onChange={(e) => setPayoutMonth(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
-                onClick={handleCalculatePayouts}
-                disabled={calculating}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2"
-                style={{ backgroundColor: MAROON }}
-              >
-                {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
-                Calculate Payouts
-              </button>
-            </div>
-            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">Payout Management</h2>
-                {loadingPayouts && <Loader2 className="w-5 h-5 animate-spin" style={{ color: MAROON }} />}
+          <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="space-y-4 px-0 sm:px-0">
+            {/* Live Transactions (Stripe Payments) */}
+            <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-100 overflow-hidden">
+              <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2">
+                <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate">Live Transactions (Stripe)</h2>
+                {loadingPayments && <Loader2 className="w-5 h-5 shrink-0 animate-spin" style={{ color: MAROON }} />}
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              {/* Mobile: cards */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {payments.length === 0 && !loadingPayments && <p className="p-4 text-center text-slate-500 text-sm">No Stripe transactions yet.</p>}
+                {payments.map((p) => (
+                  <div key={p._id} className="p-3 sm:p-4 flex flex-col gap-1.5">
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="font-medium text-slate-800 text-sm">{p.userId?.name || "—"}</p>
+                      <span className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${p.status === "Success" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-700"}`}>{p.status || "Pending"}</span>
+                    </div>
+                    <p className="text-xs text-slate-400">{p.userId?.email}</p>
+                    <p className="text-xs font-mono text-slate-600 break-all">{p.transactionId || "—"}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-600 mt-1">
+                      <span>{p.amount != null ? p.amount.toLocaleString() : "—"} LKR</span>
+                      <span>{p.productName || "Cycling Tour Package"}</span>
+                      <span className="text-slate-500">{p.createdAt ? new Date(p.createdAt).toLocaleString() : "—"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop: table */}
+              <div className="hidden md:block overflow-x-auto max-w-full">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead>
+                    <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Transaction ID</th>
+                      <th className="px-4 py-3">Amount (LKR)</th>
+                      <th className="px-4 py-3">Product</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((p) => (
+                      <tr key={p._id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-800">{p.userId?.name || "—"}</p>
+                          <p className="text-xs text-slate-400">{p.userId?.email}</p>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{p.transactionId || "—"}</td>
+                        <td className="px-4 py-3 font-medium">{p.amount != null ? p.amount.toLocaleString() : "—"} LKR</td>
+                        <td className="px-4 py-3">{p.productName || "Cycling Tour Package"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${p.status === "Success" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-700"}`}>
+                            {p.status || "Pending"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{p.createdAt ? new Date(p.createdAt).toLocaleString() : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {payments.length === 0 && !loadingPayments && <p className="hidden md:block p-6 text-center text-slate-500">No Stripe transactions yet.</p>}
+            </div>
+            <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-slate-100 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+              <span className="text-sm font-medium text-slate-700">Calculate payouts for month:</span>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
+                <input
+                  type="month"
+                  value={payoutMonth}
+                  onChange={(e) => setPayoutMonth(e.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm w-full sm:w-auto min-w-0"
+                />
+                <button
+                  type="button"
+                  onClick={handleCalculatePayouts}
+                  disabled={calculating}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ backgroundColor: MAROON }}
+                >
+                  {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
+                  Calculate Payouts
+                </button>
+              </div>
+            </div>
+            {/* Partner payout requests (manual payouts from available balance) */}
+            <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-100 overflow-hidden">
+              <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2">
+                <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate">Payout Requests</h2>
+                {loadingPayoutRequests && <Loader2 className="w-5 h-5 shrink-0 animate-spin" style={{ color: MAROON }} />}
+              </div>
+              {/* Mobile: cards */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {payoutRequests.length === 0 && !loadingPayoutRequests && <p className="p-4 text-center text-slate-500 text-sm">No payout requests yet.</p>}
+                {payoutRequests.map((r) => (
+                  <div key={r._id} className="p-3 sm:p-4 flex flex-col gap-2">
+                    <div className="flex justify-between items-start gap-2 flex-wrap">
+                      <div>
+                        <p className="font-medium text-slate-800 text-sm">{r.partnerId?.shopName || r.partnerId?.name || "—"}</p>
+                        <p className="text-xs text-slate-400">{r.partnerId?.email}</p>
+                      </div>
+                      <span className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">{r.amount?.toLocaleString()} LKR</p>
+                    <p className="text-xs text-slate-500">{r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}</p>
+                    {r.status === "Pending" && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!token) return;
+                          setProcessingRequestId(r._id);
+                          try {
+                            await approvePayoutRequest(token, r._id);
+                            setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
+                            toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
+                          } catch (err) {
+                            toast.error(err.response?.data?.message || "Failed to approve payout");
+                          } finally {
+                            setProcessingRequestId(null);
+                          }
+                        }}
+                        disabled={processingRequestId === r._id}
+                        className="w-full mt-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+                        style={{ backgroundColor: MAROON }}
+                      >
+                        {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                        Approve &amp; Pay
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* Desktop: table */}
+              <div className="hidden md:block overflow-x-auto max-w-full">
+                <table className="w-full text-sm min-w-[560px]">
+                  <thead>
+                    <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
+                      <th className="px-4 py-3">Partner</th>
+                      <th className="px-4 py-3">Amount (LKR)</th>
+                      <th className="px-4 py-3">Requested At</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payoutRequests.map((r) => (
+                      <tr key={r._id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-800">{r.partnerId?.shopName || r.partnerId?.name || "—"}</p>
+                          <p className="text-xs text-slate-400">{r.partnerId?.email}</p>
+                        </td>
+                        <td className="px-4 py-3 font-semibold">{r.amount?.toLocaleString()} LKR</td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {r.status === "Pending" && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!token) return;
+                                setProcessingRequestId(r._id);
+                                try {
+                                  await approvePayoutRequest(token, r._id);
+                                  setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
+                                  toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
+                                } catch (err) {
+                                  toast.error(err.response?.data?.message || "Failed to approve payout");
+                                } finally {
+                                  setProcessingRequestId(null);
+                                }
+                              }}
+                              disabled={processingRequestId === r._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+                              style={{ backgroundColor: MAROON }}
+                            >
+                              {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                              Approve &amp; Pay
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {payoutRequests.length === 0 && !loadingPayoutRequests && <p className="hidden md:block p-6 text-center text-slate-500">No payout requests yet.</p>}
+            </div>
+
+            <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-100 overflow-hidden">
+              <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2">
+                <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate">Payout Management</h2>
+                {loadingPayouts && <Loader2 className="w-5 h-5 shrink-0 animate-spin" style={{ color: MAROON }} />}
+              </div>
+              {/* Mobile: cards */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {payouts.length === 0 && !loadingPayouts && <p className="p-4 text-center text-slate-500 text-sm">No payouts. Use &quot;Calculate Payouts&quot; for a month.</p>}
+                {payouts.map((p) => (
+                  <div key={p._id} className="p-3 sm:p-4 flex flex-col gap-2">
+                    <div className="flex justify-between items-start gap-2 flex-wrap">
+                      <div>
+                        <p className="font-medium text-slate-800 text-sm">{p.partnerId?.shopName || p.partnerId?.name || "—"}</p>
+                        <p className="text-xs text-slate-400">{p.partnerId?.email}</p>
+                      </div>
+                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${p.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{p.status}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-slate-600">
+                      <span>{p.month}</span>
+                      <span>{p.totalTokens} tokens</span>
+                      <span className="font-semibold text-slate-800">{p.totalAmount?.toLocaleString()} LKR</span>
+                    </div>
+                    {p.status === "Paid" && p.transactionId && <p className="text-xs text-slate-400 font-mono break-all">{p.transactionId}</p>}
+                    {p.status === "Pending" && (
+                      <button
+                        type="button"
+                        onClick={() => handleProcessPayout(p)}
+                        disabled={processingPayoutId === p._id}
+                        className="w-full mt-1 py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1"
+                        style={{ backgroundColor: MAROON }}
+                      >
+                        {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                        Process Payout
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* Desktop: table */}
+              <div className="hidden md:block overflow-x-auto max-w-full">
+                <table className="w-full text-sm min-w-[600px]">
                   <thead>
                     <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
                       <th className="px-4 py-3">Partner</th>
@@ -910,9 +1311,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3">{p.totalTokens}</td>
                         <td className="px-4 py-3 font-medium">{p.totalAmount?.toLocaleString()} LKR</td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                            {p.status}
-                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{p.status}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           {p.status === "Pending" && (
@@ -934,11 +1333,22 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-              {payouts.length === 0 && !loadingPayouts && <p className="p-6 text-center text-slate-500">No payouts. Use &quot;Calculate Payouts&quot; for a month.</p>}
+              {payouts.length === 0 && !loadingPayouts && <p className="hidden md:block p-6 text-center text-slate-500">No payouts. Use &quot;Calculate Payouts&quot; for a month.</p>}
             </div>
           </motion.div>
         )}
       </div>
+
+      {/* Route Preview Modal — admin-only; opens from Pending Approvals (route name or View on Map) */}
+      {previewRoute && (
+        <RoutePreviewModal
+          route={previewRoute}
+          onClose={() => setPreviewRoute(null)}
+          onApprove={handleApproveRoute}
+          onReject={handleRejectRoute}
+          actioning={actioningRouteId === previewRoute._id}
+        />
+      )}
     </div>
   );
 }

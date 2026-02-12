@@ -25,10 +25,18 @@ export async function saveRoute(token, payload) {
 }
 
 /**
- * Fetch all public routes (any user).
+ * Fetch all public (approved) routes for map / community list.
  */
 export async function getRoutes() {
   const { data } = await axios.get(API_URL);
+  return data;
+}
+
+/**
+ * Fetch current user's routes (all statuses) for "My Routes" page with status badges.
+ */
+export async function getMyRoutes(token) {
+  const { data } = await axios.get(`${API_URL}/my-routes`, authHeader(token));
   return data;
 }
 

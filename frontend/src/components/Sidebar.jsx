@@ -26,6 +26,7 @@
  * --------------------------------------------------
  */
 
+import { useContext } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -56,6 +57,7 @@ import useAuth from "../hooks/useAuth";
 import useSidebar from "../hooks/useSidebar";
 import { ROLE_LABELS, getDashboardPath } from "../config/roles";
 import { ROLE_NAV, SHARED_NAV } from "../config/nav";
+import { ChatUnreadContext } from "../context/ChatUnreadContext";
 
 /** Shared links: Landing Page first, then Settings */
 const SHARED_TOP = SHARED_NAV.filter((item) => item.to === "/");
@@ -71,8 +73,8 @@ const COLLAPSED_W = 72; // px
    Sub-components
    ────────────────────────────────────────────── */
 
-/** Single navigation link with optional tooltip */
-function NavItem({ item, isActive, collapsed }) {
+/** Single navigation link with optional tooltip and optional badge */
+function NavItem({ item, isActive, collapsed, badge = 0 }) {
   const Icon = item.icon;
 
   return (
@@ -85,11 +87,18 @@ function NavItem({ item, isActive, collapsed }) {
             : "text-slate-500 hover:text-slate-800 hover:bg-slate-50 border-l-2 border-transparent pl-[10px]"
         }`}
       >
-        <Icon
-          className={`w-[20px] h-[20px] shrink-0 ${
-            isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
-          }`}
-        />
+        <span className="relative shrink-0">
+          <Icon
+            className={`w-[20px] h-[20px] ${
+              isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
+            }`}
+          />
+          {badge > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+              {badge > 99 ? "99+" : badge}
+            </span>
+          )}
+        </span>
         <AnimatePresence>
           {!collapsed && (
             <motion.span
@@ -109,6 +118,7 @@ function NavItem({ item, isActive, collapsed }) {
       {collapsed && (
         <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
           {item.label}
+          {badge > 0 && ` (${badge})`}
           {/* Arrow */}
           <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-y-[5px] border-y-transparent border-r-[5px] border-r-slate-900" />
         </div>
@@ -126,6 +136,7 @@ export default function Sidebar() {
   const { collapsed, toggle, sidebarWidth } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
+  const { totalUnread } = useContext(ChatUnreadContext);
 
   const role = user?.role || "cyclist";
   const roleLinks = ROLE_NAV[role] || ROLE_NAV.cyclist;
@@ -136,10 +147,11 @@ export default function Sidebar() {
     .charAt(0)
     .toUpperCase();
 
-  // Exact path match. When multiple role items share the same path, only the first is active.
+  // Exact match: pathname + search (so admin ?tab= links work). When multiple items share the same to, only the first is active.
+  const currentFull = location.pathname + (location.search || "");
   const isActive = (item, index) => {
-    if (location.pathname !== item.to) return false;
-    if (index === undefined) return true; // shared links: no duplicate paths
+    if (currentFull !== item.to) return false;
+    if (index === undefined) return true;
     const firstWithPath = roleLinks.findIndex((link) => link.to === item.to);
     return index === firstWithPath;
   };
@@ -213,6 +225,7 @@ export default function Sidebar() {
               item={item}
               isActive={isActive(item, index)}
               collapsed={collapsed}
+              badge={item.label === "Messages" ? totalUnread : 0}
             />
           ))}
         </div>

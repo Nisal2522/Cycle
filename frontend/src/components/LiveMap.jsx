@@ -704,13 +704,15 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
     e?.stopPropagation?.();
     if (!clickedPos || !token) return;
     setReporting(true);
+    const hazardData = {
+      lat: clickedPos[0],
+      lng: clickedPos[1],
+      type: reportType,
+      description: (reportDesc || "").trim(),
+    };
+    console.log("[Report Hazard] Sending payload:", hazardData);
     try {
-      const newHazard = await reportHazard(token, {
-        lat: clickedPos[0],
-        lng: clickedPos[1],
-        type: reportType,
-        description: reportDesc,
-      });
+      const newHazard = await reportHazard(token, hazardData);
       /* Add to local state immediately */
       setHazards((prev) => [newHazard, ...prev]);
       setClickedPos(null);

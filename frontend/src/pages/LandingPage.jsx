@@ -20,7 +20,7 @@ import Footer from "../components/Footer";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white font-sans antialiased">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-white font-sans antialiased">
       <Navbar />
       <Hero />
       <Stats />

@@ -36,6 +36,7 @@ import {
   Activity,
   FileBarChart,
   ScrollText,
+  MessageCircle,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 import { ROLE_LABELS } from "../config/roles";
@@ -47,6 +48,7 @@ const ROLE_NAV = {
     { label: "Overview",    to: "/dashboard",              icon: Home },
     { label: "Map",         to: "/dashboard/map",          icon: Map },
     { label: "Rewards",     to: "/dashboard/rewards",      icon: Award },
+    { label: "Messages",    to: "/dashboard/messages",     icon: MessageCircle },
     { label: "Board",       to: "/dashboard/leaderboard",  icon: Trophy },
     { label: "Weather",    to: "/dashboard/weather",      icon: CloudSun },
   ],
@@ -54,11 +56,13 @@ const ROLE_NAV = {
     { label: "Shop",    to: "/partner-dashboard", icon: Store },
     { label: "Scan QR", to: "/partner-dashboard", icon: QrCode },
     { label: "Earnings", to: "/partner-dashboard", icon: DollarSign },
+    { label: "Messages", to: "/partner-dashboard/messages", icon: MessageCircle },
     { label: "Promos",  to: "/partner-dashboard", icon: Megaphone },
   ],
   admin: [
     { label: "Users",    to: "/admin-panel", icon: Users },
     { label: "Heatmaps", to: "/admin-panel", icon: Activity },
+    { label: "Messages", to: "/admin-panel/messages", icon: MessageCircle },
     { label: "Reports",  to: "/admin-panel", icon: FileBarChart },
     { label: "Logs",     to: "/admin-panel", icon: ScrollText },
   ],

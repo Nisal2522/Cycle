@@ -38,7 +38,7 @@ export default function MapPage() {
   }, []);
 
   return (
-    <div className="px-3 sm:px-6 lg:px-8 pt-3 sm:pt-6 pb-2 sm:pb-4">
+    <div className="w-full max-w-full overflow-x-hidden px-3 sm:px-6 lg:px-8 pt-3 sm:pt-6 pb-2 sm:pb-4 min-h-[100dvh] md:min-h-screen">
       {/* ── Header ── */}
       <motion.div variants={fadeIn} initial="hidden" animate="visible">
         {/* Desktop header */}

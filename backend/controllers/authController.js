@@ -13,6 +13,7 @@
 
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
+import { v2 as cloudinary } from "cloudinary";
 import User, { ROLES } from "../models/User.js";
 import generateToken from "../utils/generateToken.js";
 
@@ -83,6 +84,7 @@ export async function registerUser(req, res) {
     role: user.role,
     shopName: user.shopName,
     shopImage: user.shopImage || "",
+    profileImage: user.profileImage || "",
     partnerTotalRedemptions: user.partnerTotalRedemptions,
     token: generateToken(user._id),
   });
@@ -121,6 +123,7 @@ export async function loginUser(req, res) {
     role: user.role,
     shopName: user.shopName,
     shopImage: user.shopImage || "",
+    profileImage: user.profileImage || "",
     partnerTotalRedemptions: user.partnerTotalRedemptions,
     token: generateToken(user._id),
   });
@@ -191,9 +194,19 @@ export async function googleLogin(req, res) {
     role: user.role,
     shopName: user.shopName || null,
     shopImage: user.shopImage || "",
+    profileImage: user.profileImage || "",
     partnerTotalRedemptions: user.partnerTotalRedemptions ?? 0,
     token: generateToken(user._id),
   });
+}
+
+/**
+ * @desc    Public stats for login/landing (e.g. total user count from User collection)
+ * @access  Public
+ */
+export async function getPublicStats(req, res) {
+  const totalUsers = await User.countDocuments();
+  res.json({ totalUsers });
 }
 
 /**
@@ -215,7 +228,64 @@ export async function getProfile(req, res) {
     role: user.role,
     shopName: user.shopName,
     shopImage: user.shopImage || "",
+    profileImage: user.profileImage || "",
     partnerTotalRedemptions: user.partnerTotalRedemptions,
     createdAt: user.createdAt,
   });
+}
+
+/**
+ * @desc    Update current user profile (name, profileImage)
+ * @body    { name?, profileImage? } — profileImage: URL string (set "" to remove)
+ * @access  Private
+ */
+export async function updateProfile(req, res) {
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+  const { name, profileImage } = req.body;
+  if (name !== undefined) user.name = String(name).trim().slice(0, 50);
+  if (profileImage !== undefined) user.profileImage = String(profileImage).trim();
+  await user.save();
+
+  res.json({
+    _id: user._id,
+    name: user.name,
+    profileImage: user.profileImage || "",
+  });
+}
+
+/**
+ * @desc    Upload profile/avatar image (Cloudinary), update user.profileImage
+ * @body    { image: "data:image/...;base64,..." }
+ * @access  Private
+ */
+export async function uploadAvatar(req, res) {
+  const { image } = req.body;
+  if (!image || typeof image !== "string" || !image.startsWith("data:image/")) {
+    res.status(400);
+    throw new Error("Invalid image: provide a base64 data URI (data:image/...)");
+  }
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) {
+    res.status(503);
+    throw new Error("Image upload is not configured.");
+  }
+  cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+  const result = await cloudinary.uploader.upload(image, {
+    folder: "cyclelink/avatars",
+    resource_type: "image",
+  });
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+  user.profileImage = result.secure_url;
+  await user.save();
+  res.json({ url: result.secure_url, profileImage: result.secure_url });
 }

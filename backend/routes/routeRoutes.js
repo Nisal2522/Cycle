@@ -13,12 +13,13 @@
 import express from "express";
 import asyncHandler from "express-async-handler";
 import { protect } from "../middleware/authMiddleware.js";
-import { createRoute, getRoutes, updateRoute, deleteRoute } from "../controllers/routeController.js";
+import { createRoute, getRoutes, getMyRoutes, updateRoute, deleteRoute } from "../controllers/routeController.js";
 
 const router = express.Router();
 
 router.post("/", protect, asyncHandler(createRoute));
 router.get("/", asyncHandler(getRoutes));
+router.get("/my-routes", protect, asyncHandler(getMyRoutes));
 router.patch("/:id", protect, asyncHandler(updateRoute));
 router.delete("/:id", protect, asyncHandler(deleteRoute));
 

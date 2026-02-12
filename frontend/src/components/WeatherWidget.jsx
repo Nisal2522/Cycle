@@ -29,7 +29,6 @@ import {
   Thermometer,
   Droplets,
   Wind,
-  AlertTriangle,
   Loader2,
   MapPinOff,
 } from "lucide-react";
@@ -246,15 +245,6 @@ export default function WeatherWidget() {
           </div>
         </div>
 
-        {/* ── Rain / Storm warning ── */}
-        {isRainy && (
-          <div className="mt-2.5 sm:mt-3 flex items-center gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl bg-amber-50/80 border border-amber-200/60">
-            <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 shrink-0" />
-            <p className="text-[11px] sm:text-xs font-medium text-amber-700">
-              Caution: Slippery roads reported. Ride safely!
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -19,7 +19,6 @@ import {
   BarChart3,
   Store,
   Users,
-  ArrowUpRight,
   Coins,
   Clock,
   TrendingUp,
@@ -29,6 +28,9 @@ import {
   Loader2,
   ShieldCheck,
   AlertTriangle,
+  Gift,
+  Sparkles,
+  CheckCircle2,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 import {
@@ -91,29 +93,25 @@ export default function PartnerDashboard() {
         icon: Coins,
         label: "Total Redemptions",
         value: totalRedemptions.toLocaleString(),
-        trend: totalRedemptions > 0 ? "+ Live" : "New",
-        color: "text-amber-500",
+        barColor: "#f59e0b",
       },
       {
         icon: Store,
         label: "Active Rewards",
         value: activeRewards.toString(),
-        trend: activeRewards > 0 ? "Running" : "None",
-        color: "text-primary",
+        barColor: "#871053",
       },
       {
         icon: Users,
         label: "Recent Cyclists",
         value: "Live",
-        trend: "+engagement",
-        color: "text-blue-500",
+        barColor: "#0ea5e9",
       },
       {
         icon: Clock,
         label: "Last Updated",
         value: "Just now",
-        trend: "",
-        color: "text-violet-500",
+        barColor: "#8b5cf6",
       },
     ],
     [activeRewards, totalRedemptions]
@@ -245,7 +243,7 @@ export default function PartnerDashboard() {
   };
 
   return (
-    <div className="min-h-[100dvh] md:min-h-screen overflow-x-hidden">
+    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 pb-6 sm:pb-8">
         {/* Header — aligned to left, matching main dashboard greeting style */}
         <motion.div
@@ -264,176 +262,208 @@ export default function PartnerDashboard() {
           </p>
         </motion.div>
 
-        {/* Stats Grid — 2 cols mobile, 4 cols desktop */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-8">
-          {STATS.map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              custom={i + 1}
-              variants={fadeIn}
-              initial="hidden"
-              animate="visible"
-              className="bg-white/95 backdrop-blur-xl rounded-2xl p-2.5 sm:p-5 shadow-[0_18px_45px_rgba(15,23,42,0.22)] border border-slate-100/80 hover:shadow-[0_22px_60px_rgba(15,23,42,0.32)] transition-shadow min-w-0"
-            >
-              <div className="flex items-center justify-between mb-1 sm:mb-3 gap-1">
-                <stat.icon className={`w-4 h-4 sm:w-6 sm:h-6 shrink-0 ${stat.color}`} />
-                <span className="text-[9px] sm:text-xs font-medium text-emerald-600 bg-emerald-50 px-1 sm:px-2 py-0.5 rounded-full flex items-center gap-0.5 truncate max-w-[80%] sm:max-w-none">
-                  <ArrowUpRight className="w-2 h-2 sm:w-3 sm:h-3 shrink-0" />
-                  <span className="truncate">{stat.trend}</span>
-                </span>
-              </div>
-              <p className="text-base sm:text-2xl font-bold text-slate-900 truncate" title={stat.value}>{stat.value}</p>
-              <p className="text-[10px] sm:text-sm text-slate-500 truncate" title={stat.label}>{stat.label}</p>
-            </motion.div>
-          ))}
+        {/* Stats Grid — same style as admin overview (attachment 1): top bar, white icon circle, value, label */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-8">
+          {STATS.map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div
+                key={stat.label}
+                custom={i + 1}
+                variants={fadeIn}
+                initial="hidden"
+                animate="visible"
+                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                className="group relative bg-white rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] border border-slate-100/80 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] hover:border-slate-200 transition-all duration-300 min-w-0"
+              >
+                <div className="h-1.5 w-full" style={{ backgroundColor: stat.barColor }} />
+                <div className="p-4 sm:p-5">
+                  <div
+                    className="inline-flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl shadow-sm transition-transform duration-300 group-hover:scale-105"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      color: stat.barColor,
+                      boxShadow: "0 6px 18px rgba(15,23,42,0.12)",
+                    }}
+                  >
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                  <p
+                    className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-4 tracking-tight truncate"
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                    title={stat.value}
+                  >
+                    {stat.value}
+                  </p>
+                  <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5 truncate" title={stat.label}>
+                    {stat.label}
+                  </p>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* Layout: stacked on mobile, 2 cols on lg */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          {/* Reward Manager + Redemption Tool */}
+          {/* Reward Manager + Redemption Tool — redesigned */}
           <motion.div
             custom={5}
             variants={fadeIn}
             initial="hidden"
             animate="visible"
-            className="bg-white/95 backdrop-blur-xl rounded-3xl p-3 sm:p-6 lg:p-7 shadow-[0_20px_60px_rgba(15,23,42,0.35)] border border-slate-100/80 flex flex-col gap-3 sm:gap-5 min-w-0"
+            className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,0.32)] border border-slate-100/80 overflow-hidden flex flex-col gap-0 min-w-0"
           >
-            {/* Reward Manager Header */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <Coins className="w-4 h-4 text-amber-500" />
-                  <h3 className="text-sm sm:text-base font-semibold text-slate-800">
-                    Reward Manager
-                  </h3>
+            {/* ── Reward Manager: header with accent ── */}
+            <div className="bg-gradient-to-br from-primary/8 via-white to-amber-50/50 border-b border-slate-100 px-5 sm:px-6 pt-5 pb-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shadow-inner border border-primary/10">
+                    <Gift className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                      Reward Manager
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      Create and manage token-based discounts for cyclists
+                    </p>
+                  </div>
                 </div>
-                <span className="text-[11px] text-slate-400">
+                <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  <Sparkles className="w-3.5 h-3.5" />
                   {activeRewards} active
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-500">
-                Create and manage token-based discounts for cyclists.
-              </p>
             </div>
 
-            {/* Reward form */}
+            {/* ── Create reward form ── */}
             <form
               onSubmit={handleSubmitReward}
-              className="space-y-2.5 sm:space-y-3 border border-slate-100 rounded-xl sm:rounded-2xl p-3 sm:p-4 bg-slate-50/60"
+              className="px-5 sm:px-6 py-4 sm:py-5 bg-slate-50/70 border-b border-slate-100"
             >
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <input
-                  type="text"
-                  value={formValues.title}
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_100px] gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Reward title</label>
+                  <input
+                    type="text"
+                    value={formValues.title}
+                    onChange={(e) =>
+                      setFormValues((v) => ({ ...v, title: e.target.value }))
+                    }
+                    placeholder="e.g. 10% Off Coffee"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tokens</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formValues.tokenCost}
+                    onChange={(e) =>
+                      setFormValues((v) => ({ ...v, tokenCost: e.target.value }))
+                    }
+                    placeholder="Cost"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm"
+                  />
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Short description (optional)</label>
+                <textarea
+                  rows={2}
+                  value={formValues.description}
                   onChange={(e) =>
-                    setFormValues((v) => ({ ...v, title: e.target.value }))
+                    setFormValues((v) => ({ ...v, description: e.target.value }))
                   }
-                  placeholder="Reward title (e.g. 10% Off)"
-                  className="flex-1 min-w-0 border border-slate-200 rounded-lg px-3 py-2.5 sm:py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/60"
-                />
-                <input
-                  type="number"
-                  min="1"
-                  value={formValues.tokenCost}
-                  onChange={(e) =>
-                    setFormValues((v) => ({ ...v, tokenCost: e.target.value }))
-                  }
-                  placeholder="Tokens"
-                  className="sm:w-28 w-full border border-slate-200 rounded-lg px-3 py-2.5 sm:py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/60"
+                  placeholder="Brief offer description"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none shadow-sm"
                 />
               </div>
-              <textarea
-                rows={2}
-                value={formValues.description}
-                onChange={(e) =>
-                  setFormValues((v) => ({ ...v, description: e.target.value }))
-                }
-                placeholder="Short description (optional)"
-                className="w-full min-w-0 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/60 resize-none"
-              />
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                  <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span>Optional expiry</span>
-                  <input
-                    type="date"
-                    value={formValues.expiryDate}
-                    onChange={(e) =>
-                      setFormValues((v) => ({
-                        ...v,
-                        expiryDate: e.target.value,
-                      }))
-                    }
-                    className="border border-slate-200 rounded-lg px-2.5 py-2 sm:py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/50 min-h-[44px] sm:min-h-0"
-                  />
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Optional expiry</label>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    <input
+                      type="date"
+                      value={formValues.expiryDate}
+                      onChange={(e) =>
+                        setFormValues((v) => ({
+                          ...v,
+                          expiryDate: e.target.value,
+                        }))
+                      }
+                      className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary min-h-[44px] sm:min-h-[42px]"
+                    />
+                  </div>
                 </div>
                 <button
                   type="submit"
                   disabled={savingReward}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-3 sm:py-1.5 rounded-lg bg-primary text-white text-sm font-semibold shadow-sm hover:bg-primary/90 disabled:opacity-60 min-h-[44px] touch-manipulation"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/25 hover:shadow-primary/30 hover:bg-primary/95 active:scale-[0.98] disabled:opacity-60 min-h-[44px] touch-manipulation transition-all"
                 >
                   {savingReward ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : editingReward ? (
-                    <Pencil className="w-3.5 h-3.5" />
+                    <Pencil className="w-4 h-4" />
                   ) : (
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-4 h-4" />
                   )}
                   {editingReward ? "Update Reward" : "Add Reward"}
                 </button>
               </div>
               {formError && (
-                <p className="text-xs text-red-600 flex items-center gap-1.5 bg-red-50 px-2.5 py-1.5 rounded-lg">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <p className="mt-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-xl border border-red-100">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
                   {formError}
                 </p>
               )}
             </form>
 
-            {/* Active Rewards — professional table / cards */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-800">
+            {/* ── Active Rewards table ── */}
+            <div className="px-5 sm:px-6 py-4 flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold text-slate-800">
                   Active Rewards
                 </h3>
                 {!loadingRewards && rewards.length > 0 && (
-                  <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
                     {rewards.length} {rewards.length === 1 ? "reward" : "rewards"}
                   </span>
                 )}
               </div>
-              <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden min-w-0">
-                {/* Desktop: table header */}
-                <div className="hidden sm:grid grid-cols-[minmax(0,2fr),100px,110px,88px] gap-3 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50/80 border-b border-slate-100">
+              <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm min-w-0">
+                <div className="hidden sm:grid grid-cols-[minmax(0,2fr),90px,100px,80px] gap-4 px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
                   <span>Reward</span>
                   <span>Cost</span>
                   <span>Expiry</span>
                   <span className="text-right">Actions</span>
                 </div>
                 {loadingRewards ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
-                    <p className="text-sm text-slate-500">Loading rewards…</p>
+                  <div className="flex flex-col items-center justify-center py-14 gap-3">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    <p className="text-sm font-medium text-slate-500">Loading rewards…</p>
                   </div>
                 ) : rewards.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                      <Coins className="w-6 h-6 text-slate-400" />
+                  <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-amber-100 flex items-center justify-center mb-4">
+                      <Coins className="w-7 h-7 text-primary/70" />
                     </div>
-                    <p className="text-sm font-medium text-slate-600">No rewards yet</p>
-                    <p className="text-xs text-slate-400 mt-0.5 max-w-[220px]">
-                      Create your first offer above to start accepting token redemptions.
+                    <p className="text-sm font-bold text-slate-700">No rewards yet</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-[240px]">
+                      Create your first offer above to start accepting token redemptions from cyclists.
                     </p>
                   </div>
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {rewards.map((r) => (
-                      <li key={r._id} className="group">
-                        {/* Mobile: card row */}
-                        <div className="sm:hidden px-4 py-3.5">
+                      <li key={r._id} className="group hover:bg-slate-50/80 transition-colors">
+                        <div className="sm:hidden px-4 py-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-slate-900 text-sm" title={r.title}>
+                              <p className="font-bold text-slate-900 text-sm" title={r.title}>
                                 {r.title}
                               </p>
                               {r.description && (
@@ -442,7 +472,7 @@ export default function PartnerDashboard() {
                                 </p>
                               )}
                               <div className="flex flex-wrap items-center gap-2 mt-2">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-xs font-medium">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200/60">
                                   {r.tokenCost} tokens
                                 </span>
                                 <span className="text-xs text-slate-400">
@@ -456,11 +486,11 @@ export default function PartnerDashboard() {
                                 </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => handleEditReward(r)}
-                                className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-500 bg-slate-50 hover:bg-primary/10 hover:text-primary transition-colors touch-manipulation"
+                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-500 bg-slate-100 hover:bg-primary/10 hover:text-primary transition-all touch-manipulation"
                                 aria-label="Edit reward"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -468,7 +498,7 @@ export default function PartnerDashboard() {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteReward(r._id)}
-                                className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 bg-slate-50 hover:bg-red-50 hover:text-red-500 transition-colors touch-manipulation"
+                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-400 bg-slate-100 hover:bg-red-50 hover:text-red-500 transition-all touch-manipulation"
                                 aria-label="Delete reward"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -476,10 +506,9 @@ export default function PartnerDashboard() {
                             </div>
                           </div>
                         </div>
-                        {/* Desktop: table row */}
-                        <div className="hidden sm:grid grid-cols-[minmax(0,2fr),100px,110px,88px] gap-3 px-4 py-3 items-center text-sm">
+                        <div className="hidden sm:grid grid-cols-[minmax(0,2fr),90px,100px,80px] gap-4 px-4 py-3.5 items-center text-sm">
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-900 truncate" title={r.title}>
+                            <p className="font-bold text-slate-900 truncate" title={r.title}>
                               {r.title}
                             </p>
                             {r.description && (
@@ -488,10 +517,10 @@ export default function PartnerDashboard() {
                               </p>
                             )}
                           </div>
-                          <span className="font-medium text-amber-700">
-                            {r.tokenCost} <span className="text-slate-400 font-normal">tokens</span>
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200/60 w-fit">
+                            {r.tokenCost}
                           </span>
-                          <span className="text-slate-500 text-xs">
+                          <span className="text-slate-500 text-xs font-medium">
                             {r.expiryDate
                               ? new Date(r.expiryDate).toLocaleDateString("en-US", {
                                   month: "short",
@@ -504,7 +533,7 @@ export default function PartnerDashboard() {
                             <button
                               type="button"
                               onClick={() => handleEditReward(r)}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors"
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary transition-all"
                               aria-label="Edit reward"
                             >
                               <Pencil className="w-4 h-4" />
@@ -512,7 +541,7 @@ export default function PartnerDashboard() {
                             <button
                               type="button"
                               onClick={() => handleDeleteReward(r._id)}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all"
                               aria-label="Delete reward"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -526,92 +555,109 @@ export default function PartnerDashboard() {
               </div>
             </div>
 
-            {/* Redemption Tool */}
-            <div className="border border-slate-100 rounded-xl sm:rounded-2xl p-3 sm:p-4 bg-slate-50/60">
-              <div className="flex items-center gap-2 mb-2">
-                <QrCode className="w-4 h-4 text-primary shrink-0" />
-                <h3 className="text-sm font-semibold text-slate-800">
-                  Redemption Tool
-                </h3>
+            {/* ── Redemption Tool ── */}
+            <div className="mx-5 sm:mx-6 mb-5 sm:mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-primary/5 border border-slate-200/80 shadow-inner">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/10">
+                  <QrCode className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">
+                    Redemption Tool
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Cyclist ID or QR value + token amount
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-slate-500 mb-3">
-                Enter cyclist ID (or QR value) and token amount to redeem.
-              </p>
               <form
                 onSubmit={handleRedeem}
-                className="flex flex-col sm:flex-row gap-2 sm:items-center"
+                className="flex flex-col sm:flex-row gap-3 sm:items-end"
               >
-                <input
-                  type="text"
-                  value={redeemCode}
-                  onChange={(e) => setRedeemCode(e.target.value)}
-                  placeholder="Cyclist ID"
-                  className="flex-1 min-w-0 border border-slate-200 rounded-lg px-3 py-2.5 sm:py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/60"
-                />
-                <input
-                  type="number"
-                  min="1"
-                  value={redeemTokensAmount}
-                  onChange={(e) => setRedeemTokensAmount(e.target.value)}
-                  className="w-full sm:w-24 border border-slate-200 rounded-lg px-3 py-2.5 sm:py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/60"
-                />
+                <div className="flex-1 min-w-0">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Cyclist ID</label>
+                  <input
+                    type="text"
+                    value={redeemCode}
+                    onChange={(e) => setRedeemCode(e.target.value)}
+                    placeholder="Enter ID or scan QR"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm"
+                  />
+                </div>
+                <div className="sm:w-24">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tokens</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={redeemTokensAmount}
+                    onChange={(e) => setRedeemTokensAmount(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm"
+                  />
+                </div>
                 <button
                   type="submit"
                   disabled={redeeming}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-3 sm:py-1.5 rounded-lg bg-primary text-white text-sm font-semibold shadow-sm hover:bg-primary/90 disabled:opacity-60 min-h-[44px] touch-manipulation"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/25 hover:shadow-primary/30 hover:bg-primary/95 active:scale-[0.98] disabled:opacity-60 min-h-[44px] touch-manipulation transition-all"
                 >
                   {redeeming ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <CheckCircle2 className="w-4 h-4" />
                   )}
                   Redeem
                 </button>
               </form>
               {redeemError && (
-                <p className="mt-2 text-xs text-red-500 flex items-start gap-1.5 break-words">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <p className="mt-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2.5 rounded-xl border border-red-100">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>{redeemError}</span>
                 </p>
               )}
               {redeemResult && (
-                <p className="mt-2 text-xs text-emerald-600 flex items-start gap-1.5 break-words">
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <p className="mt-3 flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 px-3 py-2.5 rounded-xl border border-emerald-100">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>{redeemResult}</span>
                 </p>
               )}
             </div>
           </motion.div>
 
-          {/* Recent Redemptions (still mocked for now) */}
+          {/* Recent Redemptions — professional card */}
           <motion.div
             custom={6}
             variants={fadeIn}
             initial="hidden"
             animate="visible"
-            className="bg-white/95 backdrop-blur-xl rounded-3xl p-3 sm:p-6 shadow-[0_20px_60px_rgba(15,23,42,0.32)] border border-slate-100/80 min-w-0"
+            className="bg-white rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,0.32)] border border-slate-100 overflow-hidden min-w-0"
           >
-            <div className="flex items-center justify-between mb-3 sm:mb-5">
-              <h3 className="text-sm sm:text-lg font-semibold text-slate-700">Recent Redemptions</h3>
-              <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 shrink-0" />
+            <div className="bg-gradient-to-br from-amber-50/80 via-white to-primary/5 border-b border-slate-100 px-4 sm:px-6 pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center border border-amber-200/60 shadow-sm">
+                  <BarChart3 className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 tracking-tight">Recent Redemptions</h3>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Latest token redemptions at your shop</p>
+                </div>
+              </div>
             </div>
-            <div className="space-y-0 sm:space-y-2">
+            <div className="divide-y divide-slate-100">
               {dummyRedemptions.map((item, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between gap-2 py-3 sm:py-3 border-b border-slate-100 last:border-0 min-w-0"
+                  className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 hover:bg-slate-50/80 transition-colors min-w-0"
                 >
-                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                    <div className="w-9 h-9 sm:w-9 sm:h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0 ring-2 ring-white shadow-sm">
                       {item.customer.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{item.customer}</p>
-                      <p className="text-xs text-slate-400">{item.time}</p>
+                      <p className="text-sm font-semibold text-slate-800 truncate">{item.customer}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{item.time}</p>
                     </div>
                   </div>
-                  <span className="text-xs sm:text-sm font-semibold text-amber-600 shrink-0">
-                    -{item.tokens}
+                  <span className="shrink-0 inline-flex items-center px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200/60">
+                    −{item.tokens}
                   </span>
                 </div>
               ))}

@@ -20,11 +20,6 @@ export async function getAdminStats(token) {
   return data;
 }
 
-export async function getAdminChartData(token) {
-  const { data } = await axios.get(`${API}/chart-data`, authHeader(token));
-  return data;
-}
-
 export async function getAdminUserGrowthStats(token, period = "thisYear") {
   const { data } = await axios.get(`${API}/user-growth-stats`, {
     ...authHeader(token),
@@ -60,6 +55,51 @@ export async function getAdminRoutes(token) {
   return data;
 }
 
+/** Approved routes with path for admin Live Route Overview map */
+export async function getApprovedRoutes(token) {
+  const { data } = await axios.get(`${API}/approved-routes`, authHeader(token));
+  return data;
+}
+
+/** Auto-detected route issues for admin map (inaccurate, safety, duplicate, junk) */
+export async function getRouteIssues(token) {
+  const { data } = await axios.get(`${API}/route-issues`, authHeader(token));
+  return data;
+}
+
+/** All user-reported hazards for admin map (coordinates, category, reportedBy) */
+export async function getAdminHazards(token) {
+  const { data } = await axios.get(`${API}/hazards`, authHeader(token));
+  return data;
+}
+
+/** Mark hazard as resolved (active: false); removes from map */
+export async function resolveAdminHazard(token, hazardId) {
+  const { data } = await axios.patch(`${API}/hazards/${hazardId}/resolve`, {}, authHeader(token));
+  return data;
+}
+
+/** Delete any hazard (admin only) */
+export async function deleteAdminHazard(token, hazardId) {
+  const { data } = await axios.delete(`${API}/hazards/${hazardId}`, authHeader(token));
+  return data;
+}
+
+export async function getPendingRoutes(token) {
+  const { data } = await axios.get(`${API}/pending-routes`, authHeader(token));
+  return data;
+}
+
+export async function approveRoute(token, routeId) {
+  const { data } = await axios.patch(`${API}/approve-route/${routeId}`, {}, authHeader(token));
+  return data;
+}
+
+export async function rejectRoute(token, routeId) {
+  const { data } = await axios.patch(`${API}/reject-route/${routeId}`, {}, authHeader(token));
+  return data;
+}
+
 export async function deleteAdminRoute(token, routeId) {
   const { data } = await axios.delete(`${API}/routes/${routeId}`, authHeader(token));
   return data;
@@ -77,5 +117,26 @@ export async function calculatePayouts(token, month) {
 
 export async function processPayout(token, payoutId) {
   const { data } = await axios.post(`${API}/payouts/${payoutId}/process`, {}, authHeader(token));
+  return data;
+}
+
+/** Stripe live transactions (Payments collection) for admin table */
+export async function getAdminPayments(token) {
+  const { data } = await axios.get(`${API}/payments`, authHeader(token));
+  return data;
+}
+
+/** Partner payout requests (manual payouts from available balance) */
+export async function getPayoutRequests(token) {
+  const { data } = await axios.get(`${API}/payout-requests`, authHeader(token));
+  return data;
+}
+
+export async function approvePayoutRequest(token, requestId) {
+  const { data } = await axios.post(
+    `${API}/payout-requests/${requestId}/approve`,
+    {},
+    authHeader(token)
+  );
   return data;
 }

@@ -94,3 +94,19 @@ export async function getMyPayouts(token) {
   return data;
 }
 
+/** Partner earnings summary: available balance, payouts, payout requests */
+export async function getPartnerEarnings(token) {
+  const { data } = await axios.get(`${API_BASE}/partner/earnings`, authHeader(token));
+  return data;
+}
+
+/** Create a payout request for the current partner */
+export async function createPayoutRequest(token, amount) {
+  const { data } = await axios.post(
+    `${API_BASE}/partner/payout-requests`,
+    { amount },
+    authHeader(token)
+  );
+  return data;
+}
+

@@ -5,9 +5,17 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // Proxy API and Socket.io to backend (must be running on port 5000)
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
+        secure: false,
+      },
+      '/socket.io': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
       },
     },
     // Allow Google Sign-In popup to communicate (fixes COOP postMessage errors)

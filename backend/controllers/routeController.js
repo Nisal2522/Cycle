@@ -52,15 +52,33 @@ export async function createRoute(req, res) {
 }
 
 /**
- * @desc    Get all public routes (any user), newest first
- * @access  Public
+ * @desc    Get all public routes (approved only), newest first.
+ *          This is the list shown to every cyclist on Map (Routes) and used for "View on Map".
+ *          When admin approves a route (PATCH /api/admin/approve-route/:id), it appears here.
+ * @access  Public — no auth; same response for all users
  */
 export async function getRoutes(req, res) {
-  const routes = await Route.find()
+  const routes = await Route.find({
+    $or: [{ status: "approved" }, { status: { $exists: false } }],
+  })
     .populate("creatorId", "name")
     .sort({ createdAt: -1 })
     .lean()
     .limit(100);
+
+  res.json(routes);
+}
+
+/**
+ * @desc    Get current user's routes (all statuses). For "My Routes" page with status badges.
+ * @access  Private
+ */
+export async function getMyRoutes(req, res) {
+  const creatorId = req.user._id;
+  const routes = await Route.find({ creatorId })
+    .populate("creatorId", "name")
+    .sort({ createdAt: -1 })
+    .lean();
 
   res.json(routes);
 }

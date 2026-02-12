@@ -44,13 +44,13 @@ const fadeIn = {
   }),
 };
 
-/* ── Stat card config ── */
+/* ── Stat card config (design matches Partner dashboard: top bar + icon in white box) ── */
 const STAT_CONFIG = [
-  { key: "totalRides",   label: "Total Rides",  icon: Bike,   color: "text-primary",    bgColor: "bg-primary/10",  format: (v) => v.toLocaleString() },
-  { key: "co2Saved",     label: "CO₂ Saved",    icon: Leaf,   color: "text-emerald-500", bgColor: "bg-emerald-50",  format: (v) => `${v.toFixed(1)} kg` },
-  { key: "tokens",       label: "Eco-Tokens",   icon: Award,  color: "text-amber-500",   bgColor: "bg-amber-50",    format: (v) => v.toLocaleString() },
-  { key: "totalDistance", label: "Distance",     icon: Route,  color: "text-blue-500",    bgColor: "bg-blue-50",     format: (v) => `${v.toFixed(1)} km` },
-  { key: "safetyScore",  label: "Safety Score",  icon: Shield, color: "text-violet-500",  bgColor: "bg-violet-50",   format: (v) => `${v}%` },
+  { key: "totalRides",   label: "Total Rides",  icon: Bike,   barColor: "#a91d5c",   format: (v) => v.toLocaleString() },
+  { key: "co2Saved",     label: "CO₂ Saved",    icon: Leaf,   barColor: "#10b981",   format: (v) => `${v.toFixed(1)} kg` },
+  { key: "tokens",       label: "Eco-Tokens",   icon: Award,  barColor: "#f59e0b",   format: (v) => v.toLocaleString() },
+  { key: "totalDistance", label: "Distance",     icon: Route,  barColor: "#3b82f6",   format: (v) => `${v.toFixed(1)} km` },
+  { key: "safetyScore",  label: "Safety Score",  icon: Shield, barColor: "#8b5cf6",   format: (v) => `${v}%` },
 ];
 
 /* ── Quick action links ── */
@@ -115,8 +115,8 @@ export default function CyclistDashboard() {
   };
 
   return (
-    <div className="min-h-[100dvh] md:min-h-screen">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* ── Header + Weather ── */}
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
           {/* Left: greeting */}
@@ -169,7 +169,7 @@ export default function CyclistDashboard() {
           </motion.div>
         )}
 
-        {/* ── Stats Grid ── */}
+        {/* ── Stats Grid (same design as Partner dashboard: top bar + icon in white rounded box) ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
           {STAT_CONFIG.map((cfg, i) => {
             const Icon = cfg.icon;
@@ -182,23 +182,38 @@ export default function CyclistDashboard() {
                 variants={fadeIn}
                 initial="hidden"
                 animate="visible"
-                className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 sm:p-4 lg:p-5 shadow-[0_18px_45px_rgba(15,23,42,0.22)] border border-slate-100/80 hover:shadow-[0_22px_60px_rgba(15,23,42,0.32)] transition-shadow"
+                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                className="group relative bg-white rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] border border-slate-100/80 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] hover:border-slate-200 transition-all duration-300 min-w-0"
               >
-                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl ${cfg.bgColor} flex items-center justify-center mb-2 sm:mb-3`}>
-                  <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${cfg.color}`} />
-                </div>
-                {statsLoading ? (
-                  <div className="flex items-center gap-2 h-7 sm:h-8">
-                    <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
+                <div className="h-1.5 w-full" style={{ backgroundColor: cfg.barColor }} />
+                <div className="p-4 sm:p-5">
+                  <div
+                    className="inline-flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl shadow-sm transition-transform duration-300 group-hover:scale-105"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      color: cfg.barColor,
+                      boxShadow: "0 6px 18px rgba(15,23,42,0.12)",
+                    }}
+                  >
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                ) : (
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900">
-                    {value}
+                  {statsLoading ? (
+                    <div className="flex items-center gap-2 h-8 sm:h-9 mt-4">
+                      <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
+                    </div>
+                  ) : (
+                    <p
+                      className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-4 tracking-tight truncate"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
+                      title={value}
+                    >
+                      {value}
+                    </p>
+                  )}
+                  <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5 truncate" title={cfg.label}>
+                    {cfg.label}
                   </p>
-                )}
-                <p className="text-[11px] sm:text-xs lg:text-sm text-slate-500 mt-0.5">
-                  {cfg.label}
-                </p>
+                </div>
               </motion.div>
             );
           })}

@@ -2,17 +2,13 @@
  * server.js
  * --------------------------------------------------
  * Entry point for the CycleLink backend API.
- *
- * Middleware pipeline:
- *   1. CORS          — allows frontend origin
- *   2. JSON parser   — parses request bodies
- *   3. Routes        — /api/auth, /api/cyclist, /api/hazards
- *   4. 404 handler   — catches undefined routes
- *   5. Error handler — centralised JSON error responses
+ * HTTP server + Express + Socket.io for real-time chat.
  * --------------------------------------------------
  */
 
+import http from "http";
 import express from "express";
+import { Server } from "socket.io";
 import dotenv from "dotenv";
 import cors from "cors";
 import connectDB from "./config/db.js";
@@ -25,9 +21,13 @@ import tokenRoutes from "./routes/tokenRoutes.js";
 import partnerRoutes from "./routes/partnerRoutes.js";
 import routeRoutes from "./routes/routeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
+import { stripeWebhook } from "./controllers/paymentController.js";
 import asyncHandler from "express-async-handler";
 import { protect } from "./middleware/authMiddleware.js";
 import { getRides } from "./controllers/cyclistController.js";
+import { setupChatSocket } from "./socket/chatSocket.js";
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +42,8 @@ app.use(cors({
   origin: "http://localhost:5173", // Vite dev server
   credentials: true,
 }));
+// Stripe webhook needs raw body for signature verification (must be before express.json)
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }), stripeWebhook);
 app.use(express.json({ limit: "10mb" })); // Parse JSON (10mb for image uploads)
 
 // ── Routes (admin first so /api/admin/* is never shadowed) ──
@@ -55,6 +57,8 @@ app.use("/api/rewards", rewardRoutes);
 app.use("/api/tokens", tokenRoutes);
 app.use("/api/partner", partnerRoutes);
 app.use("/api/routes", routeRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
@@ -70,11 +74,18 @@ app.get("/api/admin-check", (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-// ── Start server ──
+// ── HTTP server (for Socket.io attachment) ──
 const PORT = process.env.PORT || 5000;
+const httpServer = http.createServer(app);
 
-app.listen(PORT, () => {
+const io = new Server(httpServer, {
+  cors: { origin: "http://localhost:5173", credentials: true },
+  path: "/socket.io",
+});
+app.set("io", io);
+setupChatSocket(io);
+
+httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log("Cyclist API: GET /api/cyclist/stats, GET /api/cyclist/rides, POST /api/cyclist/update-distance, GET /api/cyclist/leaderboard");
-  console.log("Partner API mounted at: GET/PATCH /api/partner/profile, POST /api/partner/upload-image");
+  console.log("Chat socket: connect with auth.token (JWT)");
 });

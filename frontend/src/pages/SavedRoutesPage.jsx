@@ -8,7 +8,7 @@
  * --------------------------------------------------
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
@@ -26,8 +26,9 @@ import {
   Pencil,
   Trash2,
   TriangleAlert,
+  RefreshCw,
 } from "lucide-react";
-import { getRoutes, deleteRoute } from "../services/routeService";
+import { getRoutes, getMyRoutes, deleteRoute } from "../services/routeService";
 import useAuth from "../hooks/useAuth";
 
 const cardVariants = {
@@ -53,18 +54,48 @@ export default function SavedRoutesPage() {
   const [error, setError] = useState("");
   const [deleteConfirmRoute, setDeleteConfirmRoute] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load approved routes + current user's pending/rejected so status (Live/Pending/Rejected) shows for own routes.
+  // Refetch on focus so when admin approves a route, creator sees "Live" without leaving the page.
+  const loadRoutes = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError("");
+    try {
+      const approved = await getRoutes().then((d) => (Array.isArray(d) ? d : []));
+      if (!token) {
+        setRoutes(approved);
+        return;
+      }
+      const myRoutes = await getMyRoutes(token).then((d) => (Array.isArray(d) ? d : []));
+      const approvedIds = new Set(approved.map((r) => String(r._id)));
+      const myPendingOrRejected = myRoutes.filter((r) => r.status !== "approved" && r.status !== "");
+      const combined = [...approved];
+      myPendingOrRejected.forEach((r) => {
+        if (!approvedIds.has(String(r._id))) combined.push(r);
+      });
+      combined.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setRoutes(combined);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load routes");
+      setRoutes([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token]);
 
   useEffect(() => {
-    setLoading(true);
-    setError("");
-    getRoutes()
-      .then((data) => setRoutes(Array.isArray(data) ? data : []))
-      .catch((err) => {
-        setError(err.response?.data?.message || "Failed to load routes");
-        setRoutes([]);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    loadRoutes();
+  }, [loadRoutes]);
+
+  // When user returns to this tab, refetch so they see status change to "Live" after admin approval.
+  useEffect(() => {
+    const onFocus = () => loadRoutes(true);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadRoutes]);
 
   const handleViewOnMap = (route) => {
     navigate("/dashboard/map", {
@@ -115,8 +146,15 @@ export default function SavedRoutesPage() {
     return creatorId && user?._id && String(creatorId) === String(user._id);
   };
 
+  const getStatusBadge = (status) => {
+    const s = (status || "").toLowerCase();
+    if (s === "approved" || s === "") return { label: "Live", className: "bg-emerald-100 text-emerald-700 border-emerald-200", showDot: true };
+    if (s === "rejected") return { label: "Rejected", className: "bg-red-100 text-red-700 border-red-200", showDot: false };
+    return { label: "Pending", className: "bg-amber-100 text-amber-700 border-amber-200", showDot: false };
+  };
+
   return (
-    <div className="min-h-[100dvh] md:min-h-screen w-full">
+    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden">
       <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* ── Header ── */}
         <motion.div
@@ -135,14 +173,26 @@ export default function SavedRoutesPage() {
                 <p className="text-sm text-slate-500">Community saved routes — plan and explore</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate("/dashboard/map")}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-            >
-              <Map className="w-4 h-4" />
-              Open Live Map
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => loadRoutes(true)}
+                disabled={refreshing || loading}
+                className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-60 transition-colors"
+                title="Refresh to see latest status (e.g. Live after approval)"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard/map")}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+              >
+                <Map className="w-4 h-4" />
+                Open Live Map
+              </button>
+            </div>
           </div>
         </motion.div>
 
@@ -201,6 +251,15 @@ export default function SavedRoutesPage() {
                 <div className="h-1.5 bg-primary" />
 
                 <div className="p-4 sm:p-5">
+                  {/* Status badge — Live = approved & visible to all; Pending = awaiting approval; Rejected = not published */}
+                  {isOwnRoute(route) && (
+                    <div className="mb-3">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${getStatusBadge(route.status).className}`}>
+                        {getStatusBadge(route.status).showDot && <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" aria-hidden />}
+                        {getStatusBadge(route.status).label}
+                      </span>
+                    </div>
+                  )}
                   {/* Start / End */}
                   <div className="space-y-2 mb-4">
                     <div className="flex items-start gap-2">

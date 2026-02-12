@@ -30,7 +30,6 @@ import {
   Thermometer,
   Droplets,
   Wind,
-  AlertTriangle,
   Loader2,
   MapPin,
   Calendar,
@@ -247,8 +246,8 @@ export default function WeatherPage() {
   const decoded = currentData ? decodeWeather(currentData.weather_code) : null;
 
   return (
-    <div className="min-h-[100dvh] md:min-h-screen">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
 
         {/* ── Header + Search ── */}
         <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="mb-5 sm:mb-6">
@@ -374,14 +373,6 @@ export default function WeatherPage() {
                   </div>
                 )}
 
-                {decoded.isRainy && !decoded.isDangerous && (
-                  <div className="mt-4 flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-amber-500/20 border border-amber-400/30">
-                    <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 shrink-0" />
-                    <p className="text-xs sm:text-sm font-semibold text-amber-100">
-                      Caution: Slippery roads reported. Ride safely!
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           ) : (

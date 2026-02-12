@@ -62,6 +62,12 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /* Profile image for chat/avatar (all roles) */
+    profileImage: {
+      type: String,
+      trim: true,
+      default: "",
+    },
 
     /* ── Partner fields ── */
     shopName: {
@@ -98,6 +104,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: [20, "Phone number must be under 20 characters"],
+    },
+    partnerAvailableBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     partnerTotalRedemptions: {
       type: Number,

@@ -39,14 +39,20 @@ export async function getHazardMarkers() {
 }
 
 /**
- * Report a new hazard at given coordinates.
+ * Report a new hazard. Body must match DB: lat, lng, type (or category), description.
  * @param {string} token
- * @param {{ lat: number, lng: number, type?: string, description?: string }} hazardData
+ * @param {{ lat: number, lng: number, type?: string, category?: string, description?: string }} hazardData
  */
 export async function reportHazard(token, hazardData) {
+  const body = {
+    lat: hazardData.lat,
+    lng: hazardData.lng,
+    type: hazardData.type ?? hazardData.category ?? "other",
+    description: hazardData.description != null ? String(hazardData.description).trim() : "",
+  };
   const { data } = await axios.post(
     `${API_URL}/report`,
-    hazardData,
+    body,
     authHeader(token)
   );
   return data;

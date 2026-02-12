@@ -12,6 +12,7 @@
 import { v2 as cloudinary } from "cloudinary";
 import User from "../models/User.js";
 import Payout from "../models/Payout.js";
+import PayoutRequest from "../models/PayoutRequest.js";
 
 function ensurePartner(req, res) {
   if (!req.user || req.user.role !== "partner") {
@@ -21,7 +22,7 @@ function ensurePartner(req, res) {
 }
 
 const PARTNER_SELECT =
-  "name email role shopName shopImage description location address category phoneNumber partnerTotalRedemptions";
+  "name email role shopName shopImage description location address category phoneNumber partnerTotalRedemptions partnerAvailableBalance";
 
 /**
  * @desc    Get current partner's shop profile
@@ -50,6 +51,7 @@ export async function getProfile(req, res) {
     category: user.category || "",
     phoneNumber: user.phoneNumber || "",
     partnerTotalRedemptions: user.partnerTotalRedemptions || 0,
+    partnerAvailableBalance: user.partnerAvailableBalance || 0,
   });
 }
 
@@ -149,4 +151,66 @@ export async function getMyPayouts(req, res) {
     .lean();
 
   res.json(payouts);
+}
+
+/**
+ * @desc    Get partner earnings summary (available balance + payout history)
+ * @route   GET /api/partner/earnings
+ * @access  Private (partner only)
+ */
+export async function getEarningsSummary(req, res) {
+  ensurePartner(req, res);
+
+  const user = await User.findById(req.user._id).select("partnerAvailableBalance");
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  const [payouts, requests] = await Promise.all([
+    Payout.find({ partnerId: req.user._id }).sort({ month: -1 }).lean(),
+    PayoutRequest.find({ partnerId: req.user._id }).sort({ createdAt: -1 }).lean(),
+  ]);
+
+  res.json({
+    availableBalance: user.partnerAvailableBalance || 0,
+    payouts,
+    payoutRequests: requests,
+  });
+}
+
+/**
+ * @desc    Create a payout request from available balance
+ * @route   POST /api/partner/payout-requests
+ * @body    { amount: number }
+ * @access  Private (partner only)
+ */
+export async function createPayoutRequest(req, res) {
+  ensurePartner(req, res);
+
+  const { amount } = req.body;
+  const num = Number(amount);
+  if (!num || num <= 0) {
+    res.status(400);
+    throw new Error("A positive amount is required");
+  }
+
+  const user = await User.findById(req.user._id).select("partnerAvailableBalance shopName name");
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  if (user.partnerAvailableBalance < num) {
+    res.status(400);
+    throw new Error("Amount exceeds available balance");
+  }
+
+  const request = await PayoutRequest.create({
+    partnerId: user._id,
+    amount: num,
+    status: "Pending",
+  });
+
+  res.status(201).json(request);
 }

@@ -6,12 +6,13 @@
  * Fields:
  *   - creatorId       : ObjectId → User who created the route
  *   - startLocation   : String (display name)
- *   - endLocation      : String (display name)
- *   - path             : Array of { lat, lng }
- *   - distance         : String (e.g. "5.2 km")
- *   - duration         : String (e.g. "18 min")
- *   - weatherCondition : String (e.g. "Clear, 28°C")
- *   - createdAt        : Date
+ *   - endLocation     : String (display name)
+ *   - path            : Array of { lat, lng }
+ *   - distance        : String (e.g. "5.2 km")
+ *   - duration        : String (e.g. "18 min")
+ *   - weatherCondition: String (e.g. "Clear, 28°C")
+ *   - status          : 'pending' | 'approved' | 'rejected' (admin moderation)
+ *   - createdAt       : Date
  * --------------------------------------------------
  */
 
@@ -69,9 +70,16 @@ const routeSchema = new mongoose.Schema(
       default: "",
       maxlength: [120, "Weather condition must be under 120 characters"],
     },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
   },
   { timestamps: true }
 );
+
+routeSchema.index({ status: 1 });
 
 routeSchema.index({ creatorId: 1, createdAt: -1 });
 

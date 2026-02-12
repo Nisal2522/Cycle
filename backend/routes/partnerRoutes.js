@@ -17,6 +17,8 @@ import {
   updateProfile,
   uploadShopImage,
   getMyPayouts,
+  getEarningsSummary,
+  createPayoutRequest,
 } from "../controllers/partnerController.js";
 
 const router = express.Router();
@@ -28,5 +30,7 @@ router.get("/profile", protect, asyncHandler(getProfile));
 router.patch("/profile", protect, asyncHandler(updateProfile));
 router.post("/upload-image", protect, asyncHandler(uploadShopImage));
 router.get("/payouts", protect, asyncHandler(getMyPayouts));
+router.get("/earnings", protect, asyncHandler(getEarningsSummary));
+router.post("/payout-requests", protect, asyncHandler(createPayoutRequest));
 
 export default router;

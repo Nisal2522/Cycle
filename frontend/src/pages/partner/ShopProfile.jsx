@@ -160,71 +160,72 @@ export default function ShopProfile() {
   };
 
   const content = (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-5 pb-6 sm:pt-6 sm:pb-8">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-10 pb-6 sm:pb-8">
       {/* Success / error toast */}
       {toast && (
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
-          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium ${
             toast.type === "success"
               ? "bg-primary text-white"
               : "bg-red-500 text-white"
           }`}
         >
-          <CheckCircle2 className="w-5 h-5 shrink-0" />
-          <span className="text-sm font-medium">{toast.message}</span>
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {toast.message}
         </motion.div>
       )}
 
+      {/* Header — aligned with grid start */}
       <motion.div
         variants={fadeIn}
         initial="hidden"
         animate="visible"
-        className="mb-4 sm:mb-5"
+        className="flex items-center gap-3 mb-6 sm:mb-8"
       >
-        <h1 className="text-lg sm:text-xl font-bold text-slate-800">
-          Shop Profile
-        </h1>
-        <p className="mt-0.5 text-xs sm:text-sm text-slate-500 max-w-xl">
-          Manage redemptions, keep your details up to date and delight cyclists.
-        </p>
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+          <Store className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold text-slate-800">
+            Shop Profile
+          </h1>
+          <p className="text-sm text-slate-500">
+            Keep your details up to date and delight cyclists.
+          </p>
+        </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-6 lg:gap-8 items-end">
-        {/* Left: Profile card */}
+      {/* Two-column grid: 1 col Profile, 2 cols Form — full height on large screens */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
+        {/* Left column (span 1): Profile card — full height to match form */}
         <motion.div
           variants={fadeIn}
           initial="hidden"
           animate="visible"
-          className="relative rounded-3xl bg-gradient-to-b from-slate-900/95 via-slate-950 to-slate-950/95 border border-white/8 shadow-[0_24px_80px_rgba(0,0,0,0.7)] overflow-hidden px-6 py-7 sm:px-8 sm:py-9 flex flex-col justify-between"
+          className="relative rounded-2xl bg-gradient-to-b from-primary/90 via-primary to-slate-900 border border-primary/30 shadow-lg overflow-hidden px-6 py-6 sm:px-6 sm:py-7 flex flex-col min-h-0 h-full"
         >
-          {/* Soft glow header */}
-          <div className="absolute -top-40 -left-24 h-72 w-72 rounded-full bg-primary/30 blur-3xl" />
-          <div className="absolute -bottom-40 -right-20 h-72 w-72 rounded-full bg-fuchsia-500/25 blur-3xl" />
-
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,255,255,0.15),transparent)]" />
           <div className="relative flex flex-col items-center text-center">
-            <div className="relative mb-4 sm:mb-5">
-              <div className="rounded-full p-[3px] sm:p-1 bg-[conic-gradient(at_top,_theme(colors.primary.400),_#f97316,_theme(colors.primary.500),_#22c55e,_theme(colors.primary.400))] shadow-[0_0_40px_rgba(248,113,113,0.75)]">
-                <div className="w-32 h-32 sm:w-36 sm:h-36 lg:w-40 lg:h-40 rounded-full bg-slate-900/90 border border-white/10 overflow-hidden flex items-center justify-center">
-                  {profile?.shopImageUrl ? (
-                    <img
-                      src={profile.shopImageUrl}
-                      alt="Shop"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Store className="w-14 h-14 text-white/60" />
-                  )}
-                </div>
-              </div>
-
-              <label className="absolute bottom-1 right-1 flex items-center justify-center w-10 h-10 rounded-full bg-primary shadow-[0_10px_30px_rgba(0,0,0,0.6)] text-white cursor-pointer hover:bg-primary/90 transition-colors">
-                {uploadingImage ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+            <div className="relative mb-3">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full ring-4 ring-white/20 overflow-hidden flex items-center justify-center bg-slate-800/80">
+                {profile?.shopImageUrl ? (
+                  <img
+                    src={profile.shopImageUrl}
+                    alt="Shop"
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
-                  <ImagePlus className="w-5 h-5" />
+                  <Store className="w-10 h-10 text-white/50" />
+                )}
+              </div>
+              <label className="absolute bottom-0 right-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white text-primary shadow-md cursor-pointer hover:bg-white/90 transition-colors">
+                {uploadingImage ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="w-4 h-4" />
                 )}
                 <input
                   type="file"
@@ -235,155 +236,131 @@ export default function ShopProfile() {
                 />
               </label>
             </div>
-
             {uploadError && (
-              <p className="mb-2 text-xs text-red-300 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
+              <p className="mb-1.5 text-[11px] text-red-200 flex items-center justify-center gap-1">
+                <AlertCircle className="w-3 h-3" />
                 {uploadError}
               </p>
             )}
-
-            <h2 className="text-lg sm:text-xl font-semibold text-white truncate max-w-full px-4">
-              {profile?.shopName || "Delight Kitchen"}
+            <h2 className="text-base sm:text-lg font-bold text-white truncate max-w-full px-2">
+              {profile?.shopName || "Your Shop"}
             </h2>
-
-            <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary/90 text-white text-xs sm:text-sm font-semibold px-3.5 py-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.6)]">
-              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
-              Status: Active
+            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/20 text-white text-[11px] font-semibold px-2.5 py-1 backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+              Active
             </span>
           </div>
-
-          <div className="relative mt-6 text-xs sm:text-sm text-white/60 leading-relaxed hidden sm:block">
-            Your monthly stand is spot for users and can be used to redeem
-            items and limited‑edition designs for daily visits to your
-            bike‑friendly rewards.
-          </div>
+          <p className="relative mt-4 text-xs text-white/70 leading-snug text-center max-w-xs mx-auto">
+            Redeem tokens and limited‑edition rewards for bike‑friendly visits.
+          </p>
         </motion.div>
 
-        {/* Right: Edit form */}
+        {/* Right column (span 2): Shop Details form — inputs fill container */}
         <motion.div
           variants={fadeIn}
           initial="hidden"
           animate="visible"
-          className="relative bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-100/80 shadow-[0_20px_60px_rgba(15,23,42,0.45)] p-6 sm:p-7 lg:p-8"
+          className="lg:col-span-2 relative bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden flex flex-col min-h-0"
         >
-          <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+          <div className="h-1 w-full bg-primary" />
+          <div className="p-6 sm:p-8 flex-1 flex flex-col">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-5">
               Shop Details
             </h3>
-          </div>
-
-          <form onSubmit={handleSave} className="space-y-5">
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1.5">
-                Shop Name
-              </label>
-              <input
-                type="text"
-                value={form.shopName}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, shopName: e.target.value }))
-                }
-                placeholder="Delight Kitchen"
-                className="w-full rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1.5">
-                Location / City
-              </label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, location: e.target.value }))
-                }
-                placeholder="e.g. Gampaha, Colombo"
-                className="w-full rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1.5">
-                Category
-              </label>
-              <select
-                value={form.category}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, category: e.target.value }))
-                }
-                className="w-full rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-              >
-                <option value="">Select category</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1.5">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                value={form.phoneNumber}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, phoneNumber: e.target.value }))
-                }
-                placeholder="071 983 9270"
-                className="w-full rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-              />
-            </div>
-
-            {formError && (
-              <p className="text-xs text-red-600 flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                {formError}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="mt-1 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-white text-sm font-semibold py-3 shadow-[0_14px_40px_rgba(136,16,83,0.65)] hover:bg-primary/90 disabled:opacity-60 disabled:shadow-none transition-all"
-            >
-              {saving ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Save className="w-5 h-5" />
+            <form onSubmit={handleSave} className="space-y-4 w-full max-w-full">
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5">Shop Name</label>
+                <input
+                  type="text"
+                  value={form.shopName}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, shopName: e.target.value }))
+                  }
+                  placeholder="e.g. Urban Kitchen"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5">Location / City</label>
+                <input
+                  type="text"
+                  value={form.location}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, location: e.target.value }))
+                  }
+                  placeholder="e.g. Negombo, Colombo"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5">Category</label>
+                <select
+                  value={form.category}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, category: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                >
+                  <option value="">Select category</option>
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5">Phone Number</label>
+                <input
+                  type="tel"
+                  value={form.phoneNumber}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, phoneNumber: e.target.value }))
+                  }
+                  placeholder="071 983 9270"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+              {formError && (
+                <p className="text-xs text-red-600 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {formError}
+                </p>
               )}
-              {saving ? "Saving…" : "Save Changes"}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={saving}
+                className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-white text-sm font-semibold py-3 shadow-md hover:bg-primary/90 disabled:opacity-60 transition-all"
+              >
+                {saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            </form>
+          </div>
         </motion.div>
       </div>
     </div>
   );
 
   if (loading) {
-    // Loading skeleton on plain light background, aligned towards top
     return (
-      <div className="min-h-[80vh] bg-white">
-        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-5 pb-6 sm:pt-6 sm:pb-8">
-          <div className="h-6 w-40 bg-slate-200/80 rounded mb-4 animate-pulse" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 lg:p-8">
-              <div className="h-40 w-40 lg:h-52 lg:w-52 mx-auto rounded-full bg-slate-100 animate-pulse mb-4" />
-              <div className="h-5 w-32 mx-auto bg-slate-100 rounded animate-pulse mb-2" />
-              <div className="h-4 w-24 mx-auto bg-slate-100 rounded animate-pulse" />
+      <div className="min-h-0 bg-slate-100/80">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-10 pb-6 sm:pb-8">
+          <div className="h-8 w-36 bg-slate-200/80 rounded-lg mb-6 animate-pulse" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-lg p-6">
+              <div className="h-28 w-28 mx-auto rounded-full bg-slate-100 animate-pulse mb-4" />
+              <div className="h-4 w-32 mx-auto bg-slate-100 rounded animate-pulse mb-2" />
+              <div className="h-3 w-20 mx-auto bg-slate-100 rounded animate-pulse" />
             </div>
-            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 lg:p-8 space-y-4">
+            <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white shadow-lg p-6 sm:p-8 space-y-4">
+              <div className="h-5 w-28 bg-slate-100 rounded animate-pulse mb-5" />
               {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="h-10 bg-slate-100 rounded-lg animate-pulse"
-                />
+                <div key={i} className="h-11 bg-slate-100 rounded-xl animate-pulse" />
               ))}
             </div>
           </div>
@@ -392,5 +369,5 @@ export default function ShopProfile() {
     );
   }
 
-  return <div className="min-h-[80vh] bg-white">{content}</div>;
+  return <div className="min-h-0 bg-slate-100/80">{content}</div>;
 }

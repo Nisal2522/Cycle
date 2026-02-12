@@ -37,6 +37,7 @@ export default function PageTransition({ children }) {
       initial="initial"
       animate="animate"
       exit="exit"
+      className="w-full max-w-full min-h-screen min-h-[100dvh] overflow-x-hidden"
     >
       {children}
     </motion.div>

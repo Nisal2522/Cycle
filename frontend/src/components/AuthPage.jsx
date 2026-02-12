@@ -51,11 +51,19 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
+import { getAuthStats } from "../services/authService";
 import {
   validateSignUpForm,
   validateSignInForm,
   hasErrors,
 } from "../utils/validators";
+
+/** Format count for display (e.g. 1234 → "1,234", 52000 → "52k") */
+function formatUserCount(n) {
+  if (n == null || typeof n !== "number" || n < 0) return null;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return n.toLocaleString();
+}
 
 /* ── Brand SVG icons ── */
 
@@ -105,6 +113,14 @@ export default function AuthPage({
 
   // Loading overlay while backend verifies Google token
   const [googleAuthLoading, setGoogleAuthLoading] = useState(false);
+  // Total users from API (users table) for "Join X+ Urban Riders"
+  const [totalUsers, setTotalUsers] = useState(null);
+
+  useEffect(() => {
+    getAuthStats()
+      .then((data) => setTotalUsers(data?.totalUsers ?? null))
+      .catch(() => setTotalUsers(null));
+  }, []);
 
   // ── Local UI state ──
   const [mode, setMode] = useState(initialMode);
@@ -243,7 +259,7 @@ export default function AuthPage({
   }, []);
 
   return (
-    <div className="flex min-h-screen font-sans antialiased relative">
+    <div className="flex min-h-screen w-full max-w-full overflow-x-hidden font-sans antialiased relative">
       {/* Loading overlay while backend verifies Google token */}
       <AnimatePresence>
         {googleAuthLoading && (
@@ -390,7 +406,7 @@ export default function AuthPage({
             </div>
             <div>
               <p className="text-sm font-bold text-white">
-                Join 5,000+ Urban Riders
+                Join {totalUsers != null ? `${formatUserCount(totalUsers)}+` : "5,000+"} Urban Riders
               </p>
               <p className="text-xs text-primary-200/70">
                 Making cities greener together
@@ -403,7 +419,7 @@ export default function AuthPage({
       {/* ═══════════════════════════════════════════════
           RIGHT PANEL — Auth Form
          ═══════════════════════════════════════════════ */}
-      <div className="w-full lg:w-1/2 flex flex-col min-h-screen" style={{ backgroundColor: "#fdfdfd" }}>
+      <div className="w-full max-w-full lg:w-1/2 flex flex-col min-h-screen overflow-x-hidden" style={{ backgroundColor: "#fdfdfd" }}>
         {/* ── Top bar: Back button ── */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}

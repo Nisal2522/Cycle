@@ -185,3 +185,44 @@ export async function getUserProfile(token) {
     },
   });
 }
+
+/**
+ * Update current user profile (name, profileImage URL).
+ * @param {string} token
+ * @param {{ name?: string, profileImage?: string }} data
+ */
+export async function updateProfile(token, data) {
+  return apiRequest("/profile", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Upload avatar image (base64 data URI), returns URL.
+ * @param {string} token
+ * @param {string} image — data:image/...;base64,...
+ */
+export async function uploadAvatar(token, image) {
+  const data = await apiRequest("/upload-avatar", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ image }),
+  });
+  return data;
+}
+
+/**
+ * Public stats for login/landing (e.g. total user count).
+ * @returns {Promise<{ totalUsers: number }>}
+ */
+export async function getAuthStats() {
+  return apiRequest("/stats", { method: "GET" });
+}
