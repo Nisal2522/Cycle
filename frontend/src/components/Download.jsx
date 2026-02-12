@@ -16,7 +16,7 @@ import FadeIn from "./FadeIn";
 
 export default function Download() {
   return (
-    <section id="download" className="py-20 md:py-28 bg-slate-50/60">
+    <section id="download" className="py-20 md:py-28 bg-slate-50/60 dark:bg-slate-800/50">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
         <FadeIn>
           <div className="relative overflow-hidden rounded-3xl bg-primary px-8 py-16 md:px-16 md:py-20 text-center">

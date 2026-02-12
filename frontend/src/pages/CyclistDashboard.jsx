@@ -115,7 +115,7 @@ export default function CyclistDashboard() {
   };
 
   return (
-    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden">
+    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden bg-white dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300">
       <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* ── Header + Weather ── */}
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
@@ -127,11 +127,11 @@ export default function CyclistDashboard() {
             animate="visible"
             className="shrink-0"
           >
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white transition-colors duration-300">
               Welcome back,{" "}
               <span className="text-primary">{user?.name || "Cyclist"}</span>
             </h1>
-            <p className="mt-0.5 sm:mt-1 text-slate-500 text-xs sm:text-sm lg:text-base">
+            <p className="mt-0.5 sm:mt-1 text-slate-500 dark:text-slate-400 text-xs sm:text-sm lg:text-base">
               Your live cycling dashboard. Ride safe, earn green rewards!
             </p>
           </motion.div>
@@ -155,7 +155,7 @@ export default function CyclistDashboard() {
             variants={fadeIn}
             initial="hidden"
             animate="visible"
-            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-red-50 border border-red-100 text-xs sm:text-sm text-red-600 mb-3 sm:mb-4"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-xs sm:text-sm text-red-600 dark:text-red-400 mb-3 sm:mb-4 transition-colors duration-300"
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="flex-1 line-clamp-2">{statsError}</span>
@@ -183,7 +183,7 @@ export default function CyclistDashboard() {
                 initial="hidden"
                 animate="visible"
                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group relative bg-white rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] border border-slate-100/80 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] hover:border-slate-200 transition-all duration-300 min-w-0"
+                className="group relative bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] dark:shadow-none border dark:border-slate-700 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] dark:hover:border-slate-600 transition-colors duration-300 min-w-0"
               >
                 <div className="h-1.5 w-full" style={{ backgroundColor: cfg.barColor }} />
                 <div className="p-4 sm:p-5">
@@ -203,14 +203,14 @@ export default function CyclistDashboard() {
                     </div>
                   ) : (
                     <p
-                      className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-4 tracking-tight truncate"
+                      className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-4 tracking-tight truncate"
                       style={{ fontVariantNumeric: "tabular-nums" }}
                       title={value}
                     >
                       {value}
                     </p>
                   )}
-                  <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5 truncate" title={cfg.label}>
+                  <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate" title={cfg.label}>
                     {cfg.label}
                   </p>
                 </div>
@@ -233,16 +233,16 @@ export default function CyclistDashboard() {
               >
                 <Link
                   to={link.to}
-                  className="flex items-center gap-3 sm:gap-4 bg-white/95 backdrop-blur-xl rounded-2xl p-3 sm:p-4 lg:p-5 shadow-[0_18px_45px_rgba(15,23,42,0.22)] border border-slate-100/80 hover:shadow-[0_22px_60px_rgba(15,23,42,0.32)] hover:border-primary/20 transition-all group"
+                  className="flex items-center gap-3 sm:gap-4 bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl p-3 sm:p-4 lg:p-5 shadow-[0_18px_45px_rgba(15,23,42,0.22)] dark:shadow-none border dark:border-slate-700 hover:shadow-[0_22px_60px_rgba(15,23,42,0.32)] dark:hover:border-slate-600 hover:border-primary/20 transition-colors duration-300 group"
                 >
                   <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl ${link.bg} flex items-center justify-center shrink-0`}>
                     <Icon className={`w-4.5 h-4.5 sm:w-5 sm:h-5 ${link.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-800 group-hover:text-primary transition-colors">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100 group-hover:text-primary transition-colors">
                       {link.label}
                     </p>
-                    <p className="text-[11px] sm:text-xs text-slate-400">{link.desc}</p>
+                    <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500">{link.desc}</p>
                   </div>
                   <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors shrink-0" />
                 </Link>
@@ -258,9 +258,9 @@ export default function CyclistDashboard() {
           initial="hidden"
           animate="visible"
         >
-          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-4 sm:p-5 shadow-[0_20px_60px_rgba(15,23,42,0.32)] border border-slate-100/80 overflow-hidden">
+          <div className="bg-white dark:bg-slate-800 backdrop-blur-xl rounded-3xl p-4 sm:p-5 shadow-[0_20px_60px_rgba(15,23,42,0.32)] dark:shadow-none border dark:border-slate-700 overflow-hidden transition-colors duration-300">
             <div className="flex items-center justify-between mb-2 sm:mb-3">
-              <h2 className="text-base sm:text-lg font-bold text-slate-800">Live Map</h2>
+              <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white transition-colors duration-300">Live Map</h2>
               <Link
                 to="/dashboard/map"
                 className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
@@ -269,7 +269,7 @@ export default function CyclistDashboard() {
                 <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </Link>
             </div>
-            <div className="h-[260px] sm:h-[350px] lg:h-[400px] rounded-xl sm:rounded-2xl overflow-hidden border border-slate-100/80">
+            <div className="h-[260px] sm:h-[350px] lg:h-[400px] rounded-xl sm:rounded-2xl overflow-hidden border dark:border-slate-700 transition-colors duration-300">
               <LiveMap token={token} userId={user?._id} onRideUpdate={handleRideUpdate} />
             </div>
           </div>

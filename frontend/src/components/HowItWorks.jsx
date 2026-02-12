@@ -46,7 +46,7 @@ const STEPS = [
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-20 md:py-28 bg-white">
+    <section id="how-it-works" className="py-20 md:py-28 bg-white dark:bg-slate-900">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
         {/* ── Section header ── */}
         <FadeIn>
@@ -54,11 +54,11 @@ export default function HowItWorks() {
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide mb-4">
               <Trophy className="w-3.5 h-3.5" /> How It Works
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Three steps to{" "}
               <span className="text-primary">greener commutes</span>
             </h2>
-            <p className="mt-4 text-slate-500 text-lg">
+            <p className="mt-4 text-slate-500 dark:text-slate-400 text-lg">
               Getting rewarded for cycling has never been easier. Here's how
               CycleLink turns your rides into real value.
             </p>
@@ -86,10 +86,10 @@ export default function HowItWorks() {
                   </span>
                 </div>
 
-                <h3 className="text-xl font-bold text-slate-900 mb-2">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
                   {step.title}
                 </h3>
-                <p className="text-slate-500 leading-relaxed max-w-xs mx-auto text-[15px]">
+                <p className="text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto text-[15px]">
                   {step.description}
                 </p>
               </div>

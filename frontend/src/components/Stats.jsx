@@ -48,7 +48,7 @@ const IMPACT_STATS = [
 
 export default function Stats() {
   return (
-    <section className="py-20 md:py-28 bg-gradient-to-b from-rose-50/40 via-white to-slate-50/60">
+    <section className="py-20 md:py-28 bg-gradient-to-b from-rose-50/40 via-white to-slate-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
         {/* ── Section header ── */}
         <FadeIn>
@@ -56,7 +56,7 @@ export default function Stats() {
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold tracking-wide mb-4">
               <TrendingUp className="w-3.5 h-3.5" /> Live Impact
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Our community&apos;s{" "}
               <span className="text-emerald-600">real impact</span>
             </h2>

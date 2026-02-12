@@ -14,7 +14,7 @@
 
 import { createContext, useState, useCallback, useMemo } from "react";
 
-const EXPANDED_W = 256;
+const EXPANDED_W = 280;
 const COLLAPSED_W = 72;
 
 export const SidebarContext = createContext(null);

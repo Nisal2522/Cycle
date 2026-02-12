@@ -19,7 +19,7 @@
  *
  * Collapse behaviour:
  *   - Collapsed: 72px wide, icons only, tooltips on hover
- *   - Expanded: 256px wide, icons + labels
+ *   - Expanded: 280px wide, icons + labels
  *   - Smooth Framer Motion width animation
  *
  * Props: none (reads role from useAuth context)
@@ -36,6 +36,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Sun,
+  Moon,
   // Cyclist
   Map,
   MapPin,
@@ -54,6 +56,7 @@ import {
   Activity,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
+import { useTheme } from "../context/ThemeContext";
 import useSidebar from "../hooks/useSidebar";
 import { ROLE_LABELS, getDashboardPath } from "../config/roles";
 import { ROLE_NAV, SHARED_NAV } from "../config/nav";
@@ -66,14 +69,14 @@ const SHARED_BOTTOM = SHARED_NAV.filter((item) => item.to === "/settings");
 /* ──────────────────────────────────────────────
    Sidebar widths
    ────────────────────────────────────────────── */
-const EXPANDED_W = 256; // px
+const EXPANDED_W = 280; // px
 const COLLAPSED_W = 72; // px
 
 /* ──────────────────────────────────────────────
    Sub-components
    ────────────────────────────────────────────── */
 
-/** Single navigation link with optional tooltip and optional badge */
+/** Single navigation link: pill active state, 3px left bar, duotone icon, hover slide. */
 function NavItem({ item, isActive, collapsed, badge = 0 }) {
   const Icon = item.icon;
 
@@ -81,16 +84,26 @@ function NavItem({ item, isActive, collapsed, badge = 0 }) {
     <div className="relative group">
       <Link
         to={item.to}
-        className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all relative ${
+        className={`flex items-center gap-3 px-4 py-3.5 rounded-full text-sm font-medium transition-all duration-200 relative ${
           isActive
-            ? "bg-primary/10 text-primary border-l-2 border-primary pl-[10px]"
-            : "text-slate-500 hover:text-slate-800 hover:bg-slate-50 border-l-2 border-transparent pl-[10px]"
+            ? "bg-primary-50 dark:bg-primary/15 text-primary dark:text-primary"
+            : "text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800/80"
         }`}
       >
-        <span className="relative shrink-0">
+        {/* Active: 3px vertical bar with rounded corners on the left */}
+        {isActive && (
+          <span
+            className="absolute left-0 top-1/2 -translate-y-1/2 h-[70%] w-[3px] bg-primary rounded-r-full"
+            aria-hidden
+          />
+        )}
+        <span className="relative shrink-0 flex items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5">
           <Icon
-            className={`w-[20px] h-[20px] ${
-              isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
+            strokeWidth={1.5}
+            className={`w-[20px] h-[20px] transition-colors duration-200 ${
+              isActive
+                ? "text-primary fill-primary/20 dark:fill-primary/30"
+                : "text-slate-400 fill-slate-300/50 dark:text-slate-500 dark:fill-slate-500/40 group-hover:text-slate-600 dark:group-hover:text-slate-300"
             }`}
           />
           {badge > 0 && (
@@ -134,6 +147,7 @@ function NavItem({ item, isActive, collapsed, badge = 0 }) {
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const { collapsed, toggle, sidebarWidth } = useSidebar();
+  const { isDark, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const { totalUnread } = useContext(ChatUnreadContext);
@@ -165,10 +179,10 @@ export default function Sidebar() {
     <motion.aside
       animate={{ width: sidebarWidth }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 z-40 bg-white border-r border-slate-200/80 overflow-hidden"
+      className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-r border-[rgba(0,0,0,0.05)] dark:border-[rgba(255,255,255,0.06)] overflow-hidden transition-colors duration-300"
     >
       {/* ── Logo + Collapse toggle ── */}
-      <div className="flex items-center justify-between px-4 h-16 shrink-0 border-b border-slate-100">
+      <div className="flex items-center justify-between px-5 h-16 shrink-0 border-b border-slate-200/80 dark:border-slate-700/80">
         <Link to={getDashboardPath(role)} className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20 shrink-0">
             <Bike className="w-5 h-5 text-white" />
@@ -180,7 +194,7 @@ export default function Sidebar() {
                 animate={{ opacity: 1, width: "auto" }}
                 exit={{ opacity: 0, width: 0 }}
                 transition={{ duration: 0.2 }}
-                className="text-lg font-extrabold tracking-tight text-slate-900 whitespace-nowrap overflow-hidden"
+                className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white whitespace-nowrap overflow-hidden"
               >
                 Cycle<span className="text-primary">Link</span>
               </motion.span>
@@ -190,7 +204,7 @@ export default function Sidebar() {
 
         <button
           onClick={toggle}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all shrink-0"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (
@@ -202,15 +216,15 @@ export default function Sidebar() {
       </div>
 
       {/* ── Navigation ── */}
-      <nav className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden px-3 py-4">
-        {/* Role label */}
+      <nav className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden px-4 py-5">
+        {/* Role label — CYCLIST / PARTNER / ADMIN */}
         <AnimatePresence>
           {!collapsed && (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 px-3 mb-2"
+              className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 px-3 mb-3"
             >
               {roleLabel}
             </motion.p>
@@ -218,7 +232,7 @@ export default function Sidebar() {
         </AnimatePresence>
 
         {/* Role-specific links */}
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {roleLinks.map((item, index) => (
             <NavItem
               key={item.label}
@@ -230,24 +244,24 @@ export default function Sidebar() {
           ))}
         </div>
 
-        {/* Divider */}
-        <div className="my-5 mx-3 border-t border-slate-100" />
+        {/* Separator between role section and GENERAL */}
+        <div className="my-5 mx-1 border-t border-slate-200/90 dark:border-slate-700/90" />
 
-        {/* Shared links */}
+        {/* General section label */}
         <AnimatePresence>
           {!collapsed && (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 px-3 mb-2"
+              className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 px-3 mb-3"
             >
               General
             </motion.p>
           )}
         </AnimatePresence>
 
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {SHARED_TOP.map((item) => (
             <NavItem
               key={item.label}
@@ -264,6 +278,59 @@ export default function Sidebar() {
               collapsed={collapsed}
             />
           ))}
+          {/* Theme / Dark Mode toggle */}
+          <div className={`relative group flex items-center gap-3 px-4 py-3.5 rounded-full transition-all duration-200 hover:bg-gray-50 dark:hover:bg-slate-800/80 ${collapsed ? "justify-center" : ""}`}>
+            <span className="shrink-0 transition-transform duration-200 group-hover:translate-x-0.5">
+              {isDark ? (
+                <Sun className="w-5 h-5 text-amber-400 fill-amber-400/20" strokeWidth={1.5} />
+              ) : (
+                <Moon className="w-5 h-5 text-slate-400 fill-slate-300/50 dark:text-slate-500 dark:fill-slate-500/40 group-hover:text-slate-600 dark:group-hover:text-slate-300" strokeWidth={1.5} />
+              )}
+            </span>
+            <AnimatePresence>
+              {!collapsed && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center justify-between flex-1 min-w-0"
+                >
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap overflow-hidden">
+                    {isDark ? "Light mode" : "Dark mode"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    role="switch"
+                    aria-checked={isDark}
+                    aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                    className="relative w-10 h-6 rounded-full bg-slate-200 dark:bg-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <span
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                        isDark ? "left-5" : "left-1"
+                      }`}
+                    />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {collapsed && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                className="absolute inset-0"
+              />
+            )}
+            {collapsed && (
+              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-slate-900 dark:bg-slate-700 text-white text-xs font-medium rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                {isDark ? "Light mode" : "Dark mode"}
+                <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-y-[5px] border-y-transparent border-r-[5px] border-r-slate-900 dark:border-r-slate-700" />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Push profile card to bottom */}
@@ -271,10 +338,10 @@ export default function Sidebar() {
       </nav>
 
       {/* ── User profile + Logout ── */}
-      <div className="shrink-0 border-t border-slate-100 p-3">
+      <div className="shrink-0 border-t border-slate-200/80 dark:border-slate-700/80 p-4 bg-slate-50/50 dark:bg-slate-900/50">
         {/* Profile card */}
         <div
-          className={`flex items-center gap-3 rounded-xl p-2.5 bg-slate-50 mb-2 ${
+          className={`flex items-center gap-3 rounded-xl p-3 border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-800/80 shadow-sm mb-3 ${
             collapsed ? "justify-center" : ""
           }`}
         >
@@ -306,7 +373,7 @@ export default function Sidebar() {
                 transition={{ duration: 0.2 }}
                 className="min-w-0 overflow-hidden"
               >
-                <p className="text-sm font-semibold text-slate-800 truncate">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
                   {displayName || "User"}
                 </p>
                 <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
@@ -321,11 +388,11 @@ export default function Sidebar() {
         <div className="relative group">
           <button
             onClick={handleLogout}
-            className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all ${
+            className={`flex items-center gap-3 w-full px-4 py-3 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20 transition-all duration-200 ${
               collapsed ? "justify-center" : ""
             }`}
           >
-            <LogOut className="w-[20px] h-[20px] shrink-0" />
+            <LogOut className="w-[20px] h-[20px] shrink-0 text-slate-400 dark:text-slate-500" strokeWidth={1.5} />
             <AnimatePresence>
               {!collapsed && (
                 <motion.span

@@ -50,6 +50,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import PageTransition from "./components/PageTransition";
 import Sidebar from "./components/Sidebar";
 import MobileBottomNav from "./components/MobileBottomNav";
+import ChatBot from "./components/ChatBot";
 
 // Context & Hooks
 import SidebarProvider from "./context/SidebarContext";
@@ -104,8 +105,10 @@ export default function App() {
   const { user } = useAuth();
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
+    <>
+      <ChatBot />
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
         {/* ── Public routes ── */}
         <Route
           path="/"
@@ -200,5 +203,6 @@ export default function App() {
         />
       </Routes>
     </AnimatePresence>
+    </>
   );
 }

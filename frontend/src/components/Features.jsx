@@ -45,7 +45,7 @@ const FEATURES = [
 
 export default function Features() {
   return (
-    <section id="features" className="py-20 md:py-28 bg-slate-50/60">
+    <section id="features" className="py-20 md:py-28 bg-slate-50/60 dark:bg-slate-800/50">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
         {/* ── Section header ── */}
         <FadeIn>
@@ -53,11 +53,11 @@ export default function Features() {
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide mb-4">
               <Zap className="w-3.5 h-3.5" /> Core Features
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Everything you need for a{" "}
               <span className="text-primary">safer ride</span>
             </h2>
-            <p className="mt-4 text-slate-500 text-lg">
+            <p className="mt-4 text-slate-500 dark:text-slate-400 text-lg">
               Powerful features designed with cyclists in mind — safety, rewards,
               and sustainability woven into every ride.
             </p>
@@ -72,7 +72,7 @@ export default function Features() {
                 className={`group relative rounded-2xl p-7 h-full transition-all duration-300 hover:-translate-y-1 ${
                   feature.highlight
                     ? "bg-primary text-white shadow-xl shadow-primary/20"
-                    : "bg-white border border-slate-200/80 hover:shadow-xl hover:shadow-slate-200/60"
+                    : "bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-600 hover:shadow-xl hover:shadow-slate-200/60 dark:hover:shadow-slate-900/40"
                 }`}
               >
                 {/* Safety badge (only on highlighted card) */}
@@ -100,7 +100,7 @@ export default function Features() {
                 {/* Title */}
                 <h3
                   className={`text-xl font-bold mb-3 ${
-                    feature.highlight ? "text-white" : "text-slate-900"
+                    feature.highlight ? "text-white" : "text-slate-900 dark:text-white"
                   }`}
                 >
                   {feature.title}
@@ -109,7 +109,7 @@ export default function Features() {
                 {/* Description */}
                 <p
                   className={`leading-relaxed text-[15px] ${
-                    feature.highlight ? "text-white/80" : "text-slate-500"
+                    feature.highlight ? "text-white/80" : "text-slate-500 dark:text-slate-400"
                   }`}
                 >
                   {feature.description}

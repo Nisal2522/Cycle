@@ -243,7 +243,7 @@ export default function PartnerDashboard() {
   };
 
   return (
-    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden">
+    <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden bg-white dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 pb-6 sm:pb-8">
         {/* Header — aligned to left, matching main dashboard greeting style */}
         <motion.div
@@ -253,11 +253,11 @@ export default function PartnerDashboard() {
           animate="visible"
           className="mb-4 sm:mb-6"
         >
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white">
             Welcome back,{" "}
             <span className="text-primary">{partnerDisplayName}</span>
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-slate-500 text-xs sm:text-sm lg:text-base">
+          <p className="mt-0.5 sm:mt-1 text-slate-500 dark:text-slate-400 text-xs sm:text-sm lg:text-base">
             Your shop dashboard. Manage redemptions, earn green rewards!
           </p>
         </motion.div>
@@ -274,7 +274,7 @@ export default function PartnerDashboard() {
                 initial="hidden"
                 animate="visible"
                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group relative bg-white rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] border border-slate-100/80 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] hover:border-slate-200 transition-all duration-300 min-w-0"
+                className="group relative bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] dark:shadow-none border dark:border-slate-700 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] dark:hover:border-slate-600 transition-all duration-300 min-w-0"
               >
                 <div className="h-1.5 w-full" style={{ backgroundColor: stat.barColor }} />
                 <div className="p-4 sm:p-5">
@@ -289,13 +289,13 @@ export default function PartnerDashboard() {
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
                   <p
-                    className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-4 tracking-tight truncate"
+                    className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-4 tracking-tight truncate"
                     style={{ fontVariantNumeric: "tabular-nums" }}
                     title={stat.value}
                   >
                     {stat.value}
                   </p>
-                  <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5 truncate" title={stat.label}>
+                  <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate" title={stat.label}>
                     {stat.label}
                   </p>
                 </div>
@@ -312,7 +312,7 @@ export default function PartnerDashboard() {
             variants={fadeIn}
             initial="hidden"
             animate="visible"
-            className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,0.32)] border border-slate-100/80 overflow-hidden flex flex-col gap-0 min-w-0"
+            className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,0.32)] dark:shadow-none border dark:border-slate-700 overflow-hidden flex flex-col gap-0 min-w-0"
           >
             {/* ── Reward Manager: header with accent ── */}
             <div className="bg-gradient-to-br from-primary/8 via-white to-amber-50/50 border-b border-slate-100 px-5 sm:px-6 pt-5 pb-4">

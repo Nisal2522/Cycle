@@ -32,7 +32,7 @@ export default function Hero() {
   const [heroEmail, setHeroEmail] = useState("");
   const navigate = useNavigate();
   return (
-    <section className="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24 bg-gradient-to-br from-slate-50 via-white to-primary-50/40">
+    <section className="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24 bg-gradient-to-br from-slate-50 via-white to-primary-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
       {/* Decorative background blobs */}
       <div className="absolute -top-32 -right-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 -left-24 w-72 h-72 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
@@ -47,14 +47,14 @@ export default function Hero() {
           </FadeIn>
 
           <FadeIn delay={0.1}>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-slate-900">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-slate-900 dark:text-white">
               Ride Safe Routes.{" "}
               <span className="text-primary">Earn Green Rewards.</span>
             </h1>
           </FadeIn>
 
           <FadeIn delay={0.2}>
-            <p className="mt-6 text-lg text-slate-500 max-w-lg leading-relaxed">
+            <p className="mt-6 text-lg text-slate-500 dark:text-slate-400 max-w-lg leading-relaxed">
               CycleLink maps the safest bicycle routes in your city, warns you
               about real-time hazards, and rewards every pedal stroke with
               eco-tokens redeemable at local partner shops.
@@ -78,7 +78,7 @@ export default function Hero() {
                   value={heroEmail}
                   onChange={(e) => setHeroEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="w-full pl-11 pr-4 py-3.5 rounded-full border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  className="w-full pl-11 pr-4 py-3.5 rounded-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                 />
               </div>
               <button
@@ -114,8 +114,8 @@ export default function Hero() {
                     />
                   ))}
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Loved by <strong className="text-slate-700">50 000+</strong>{" "}
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Loved by <strong className="text-slate-700 dark:text-slate-300">50 000+</strong>{" "}
                   cyclists
                 </p>
               </div>

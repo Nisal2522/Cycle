@@ -91,7 +91,7 @@ export default function MobileBottomNav() {
   return (
     <>
       {/* ── Bottom bar ── */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/80 backdrop-blur-xl border-t border-slate-200/80 safe-area-bottom">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-700 safe-area-bottom">
         <div className="flex items-center justify-around h-16 px-2">
           {barItems.map((item) => {
             const Icon = item.icon;
@@ -156,7 +156,7 @@ export default function MobileBottomNav() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 400 }}
-              className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-2xl shadow-2xl"
+              className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white dark:bg-slate-900 rounded-t-2xl shadow-2xl"
             >
               {/* Handle + close */}
               <div className="flex items-center justify-between px-5 pt-3 pb-2">

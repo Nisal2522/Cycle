@@ -23,6 +23,7 @@ body {
   overflow-x: hidden;
   width: 100%;
   min-height: 100vh;
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
 }
 
 #root {

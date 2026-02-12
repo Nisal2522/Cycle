@@ -259,7 +259,7 @@ export default function AuthPage({
   }, []);
 
   return (
-    <div className="flex min-h-screen w-full max-w-full overflow-x-hidden font-sans antialiased relative">
+    <div className="flex min-h-screen w-full max-w-full overflow-x-hidden font-sans antialiased relative bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors">
       {/* Loading overlay while backend verifies Google token */}
       <AnimatePresence>
         {googleAuthLoading && (
@@ -271,9 +271,9 @@ export default function AuthPage({
             aria-live="polite"
             aria-busy="true"
           >
-            <div className="flex flex-col items-center gap-4 rounded-2xl bg-white px-8 py-6 shadow-xl">
+            <div className="flex flex-col items-center gap-4 rounded-2xl bg-white dark:bg-slate-800 px-8 py-6 shadow-xl">
               <Loader2 className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-sm font-medium text-slate-700">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                 Verifying your Google account…
               </p>
             </div>
@@ -419,7 +419,7 @@ export default function AuthPage({
       {/* ═══════════════════════════════════════════════
           RIGHT PANEL — Auth Form
          ═══════════════════════════════════════════════ */}
-      <div className="w-full max-w-full lg:w-1/2 flex flex-col min-h-screen overflow-x-hidden" style={{ backgroundColor: "#fdfdfd" }}>
+      <div className="w-full max-w-full lg:w-1/2 flex flex-col min-h-screen overflow-x-hidden bg-[#fdfdfd] dark:bg-slate-900 transition-colors">
         {/* ── Top bar: Back button ── */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -429,7 +429,7 @@ export default function AuthPage({
         >
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-sm transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Home
@@ -449,7 +449,7 @@ export default function AuthPage({
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary-400 flex items-center justify-center shadow-lg shadow-primary/20">
                 <Bike className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-extrabold text-slate-900 tracking-tight">
+              <span className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                 Cycle<span className="text-primary">Link</span>
               </span>
             </motion.div>
@@ -465,11 +465,11 @@ export default function AuthPage({
               >
                 <motion.h1
                   variants={fadeUp}
-                  className="text-3xl sm:text-[2rem] font-extrabold text-slate-900 tracking-tight"
+                  className="text-3xl sm:text-[2rem] font-extrabold text-slate-900 dark:text-white tracking-tight"
                 >
                   {isSignUp ? "Join the Movement" : "Welcome Back"}
                 </motion.h1>
-                <motion.p variants={fadeUp} className="mt-2 text-slate-500 text-[15px] leading-relaxed">
+                <motion.p variants={fadeUp} className="mt-2 text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed">
                   {isSignUp
                     ? "Create your account and start earning green rewards."
                     : "Enter your details to continue your green journey."}
@@ -514,7 +514,7 @@ export default function AuthPage({
                     type="button"
                     onClick={renderProps.onClick}
                     disabled={renderProps.disabled || googleAuthLoading}
-                    className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-sm font-medium text-slate-700 shadow-sm transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed w-full"
+                    className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed w-full"
                   >
                     <GoogleIcon />
                     Google
@@ -523,7 +523,7 @@ export default function AuthPage({
               />
               <button
                 type="button"
-                className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-sm font-medium text-slate-700 shadow-sm transition-all active:scale-[0.97]"
+                className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-all active:scale-[0.97]"
               >
                 <AppleIcon />
                 Apple
@@ -532,11 +532,11 @@ export default function AuthPage({
 
             {/* ── Divider ── */}
             <motion.div variants={fadeUp} className="flex items-center gap-3 my-5">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-600" />
+              <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                 or continue with email
               </span>
-              <div className="flex-1 h-px bg-slate-200" />
+              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-600" />
             </motion.div>
 
             {/* ── Form ── */}
@@ -571,7 +571,7 @@ export default function AuthPage({
                         placeholder="John Doe"
                         aria-invalid={!!getFieldError("name")}
                         aria-describedby={getFieldError("name") ? "name-error" : undefined}
-                        className={`w-full pl-11 pr-4 py-3.5 rounded-xl border bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                        className={`w-full pl-11 pr-4 py-3.5 rounded-xl border bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border-slate-200 dark:border-slate-600 focus:outline-none focus:ring-2 transition-all ${
                           getFieldError("name")
                             ? "border-red-300 focus:ring-red-200 focus:border-red-400"
                             : "border-slate-200 focus:ring-primary/25 focus:border-primary"
@@ -637,7 +637,7 @@ export default function AuthPage({
                       placeholder="you@example.com"
                       aria-invalid={!!getFieldError("email")}
                       aria-describedby={getFieldError("email") ? "email-error" : undefined}
-                      className={`w-full pl-11 pr-4 py-3.5 rounded-xl border bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                      className={`w-full pl-11 pr-4 py-3.5 rounded-xl border bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border-slate-200 dark:border-slate-600 focus:outline-none focus:ring-2 transition-all ${
                         getFieldError("email")
                           ? "border-red-300 focus:ring-red-200 focus:border-red-400"
                           : "border-slate-200 focus:ring-primary/25 focus:border-primary"
@@ -685,10 +685,10 @@ export default function AuthPage({
                       }
                       aria-invalid={!!getFieldError("password")}
                       aria-describedby={getFieldError("password") ? "password-error" : undefined}
-                      className={`w-full pl-11 pr-12 py-3.5 rounded-xl border bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                      className={`w-full pl-11 pr-12 py-3.5 rounded-xl border bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all ${
                         getFieldError("password")
                           ? "border-red-300 focus:ring-red-200 focus:border-red-400"
-                          : "border-slate-200 focus:ring-primary/25 focus:border-primary"
+                          : "border-slate-200 dark:border-slate-600 focus:ring-primary/25 focus:border-primary"
                       }`}
                     />
                     <button

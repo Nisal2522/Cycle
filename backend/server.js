@@ -23,6 +23,7 @@ import routeRoutes from "./routes/routeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 import { stripeWebhook } from "./controllers/paymentController.js";
 import asyncHandler from "express-async-handler";
 import { protect } from "./middleware/authMiddleware.js";
@@ -59,6 +60,7 @@ app.use("/api/partner", partnerRoutes);
 app.use("/api/routes", routeRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

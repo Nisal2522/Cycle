@@ -440,14 +440,14 @@ export default function AdminDashboard() {
     : null;
 
   return (
-    <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-slate-50">
+    <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-white dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300">
       <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="mb-6">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Welcome back,{" "}
             <span style={{ color: MAROON }}>{user?.name || "Admin"}</span>
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-slate-500 text-xs sm:text-sm lg:text-base">
+          <p className="mt-0.5 sm:mt-1 text-slate-500 dark:text-slate-400 text-xs sm:text-sm lg:text-base">
             Manage users, routes, and partner payouts. Keep the platform safe and running.
           </p>
         </motion.div>
@@ -488,7 +488,7 @@ export default function AdminDashboard() {
                 [...Array(4)].map((_, i) => (
                   <div
                     key={i}
-                    className="bg-white/90 backdrop-blur rounded-3xl p-5 border border-slate-100 animate-pulse h-32 shadow-[0_18px_45px_rgba(15,23,42,0.08)]"
+                    className="bg-white dark:bg-slate-800 rounded-3xl p-5 border dark:border-slate-700 animate-pulse h-32 shadow-[0_18px_45px_rgba(15,23,42,0.08)] dark:shadow-none"
                   />
                 ))
               ) : (
@@ -505,7 +505,7 @@ export default function AdminDashboard() {
                     initial="hidden"
                     animate="visible"
                     whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                    className="group relative bg-white/95 backdrop-blur rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] border border-slate-100/80 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] hover:border-slate-200 transition-all duration-300"
+                    className="group relative bg-white dark:bg-slate-800 backdrop-blur rounded-3xl overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.12)] dark:shadow-none border dark:border-slate-700 hover:shadow-[0_26px_70px_rgba(15,23,42,0.18)] dark:hover:border-slate-600 transition-all duration-300"
                     style={{
                       WebkitFontSmoothing: "antialiased",
                     }}
@@ -524,12 +524,12 @@ export default function AdminDashboard() {
                         <s.icon className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
                       <p
-                        className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-4 tracking-tight"
+                        className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-4 tracking-tight"
                         style={{ fontVariantNumeric: "tabular-nums" }}
                       >
                         {s.value}
                       </p>
-                      <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5">
+                      <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">
                         {s.label}
                       </p>
                     </div>
