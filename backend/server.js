@@ -38,9 +38,10 @@ connectDB();
 
 const app = express();
 
-// ── CORS: allow frontend origin(s). Set FRONTEND_ORIGIN in production (e.g. https://cycle-rose-tau.vercel.app).
+// ── CORS: allow frontend origin(s). Vercel app + optional FRONTEND_ORIGIN (comma-separated).
 const allowedOrigins = [
   "http://localhost:5173",
+  "https://cycle-rose-tau.vercel.app",
   ...(process.env.FRONTEND_ORIGIN ? process.env.FRONTEND_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean) : []),
 ];
 app.use(cors({
