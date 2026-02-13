@@ -40,7 +40,7 @@ const app = express();
 
 // ── Global middleware ──
 app.use(cors({
-  origin: "http://localhost:5173", // Vite dev server
+  origin: "https://cycle-rose-tau.vercel.app", // Vite dev server
   credentials: true,
 }));
 // Stripe webhook needs raw body for signature verification (must be before express.json)

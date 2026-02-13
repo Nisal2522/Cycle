@@ -7,7 +7,7 @@ export default defineConfig({
     proxy: {
       // Proxy API and Socket.io to backend (must be running on port 5000)
       '/api': {
-        target: 'https://cyclelink-api.onrender.com',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
         secure: false,
       },
