@@ -10,7 +10,8 @@
 
 import axios from "axios";
 
-const API_URL = "/api/routes";
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const API_URL = BASE ? `${BASE}/routes` : "/api/routes";
 
 function authHeader(token) {
   return { headers: { Authorization: `Bearer ${token}` } };

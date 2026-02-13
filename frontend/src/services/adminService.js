@@ -7,9 +7,8 @@
 
 import axios from "axios";
 
-// Use same origin in dev (Vite proxy forwards /api to backend). Set VITE_API_URL if backend is elsewhere.
 const BASE = import.meta.env.VITE_API_URL ?? "";
-const API = `${BASE}/api/admin`;
+const API = BASE ? `${BASE}/admin` : "/api/admin";
 
 function authHeader(token) {
   return { headers: { Authorization: `Bearer ${token}` } };

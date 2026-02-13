@@ -12,10 +12,12 @@ function authHeader(token) {
   return { headers: { Authorization: `Bearer ${token}` } };
 }
 
+const paymentsBase = BASE ? `${BASE}/payments` : "/api/payments";
+
 /** Create checkout session; returns { url, sessionId }. Redirect user to url. */
 export async function createCheckoutSession(token) {
   const { data } = await axios.post(
-    `${BASE}/api/payments/create-checkout-session`,
+    `${paymentsBase}/create-checkout-session`,
     {},
     authHeader(token)
   );
@@ -25,7 +27,7 @@ export async function createCheckoutSession(token) {
 /** Confirm payment after success redirect (saves to DB if webhook didn't). */
 export async function confirmSession(token, sessionId) {
   const { data } = await axios.post(
-    `${BASE}/api/payments/confirm-session`,
+    `${paymentsBase}/confirm-session`,
     { sessionId },
     authHeader(token)
   );

@@ -10,7 +10,8 @@
 
 import axios from "axios";
 
-const API_URL = "/api/cyclist";
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const API_URL = BASE ? `${BASE}/cyclist` : "/api/cyclist";
 
 /** Helper — creates auth headers from JWT token */
 function authHeader(token) {

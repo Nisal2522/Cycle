@@ -6,7 +6,8 @@
 
 import { io } from "socket.io-client";
 
-const CHAT_API = "/api/chat";
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const CHAT_API = BASE ? `${BASE}/chat` : "/api/chat";
 
 async function chatFetch(path, token, options = {}) {
   const res = await fetch(`${CHAT_API}${path}`, {
@@ -65,12 +66,13 @@ export async function deleteMessage(token, chatId, messageId, scope = "everyone"
 
 /**
  * Create and connect socket with JWT. Returns socket instance.
- * Events: new_message, user_typing, user_stop_typing, online_users
- * Emit: join_chat(chatId), leave_chat(chatId), send_message({ chatId, content }), typing({ chatId }), stop_typing({ chatId })
+ * In production (VITE_API_URL set), connect to backend origin; otherwise same-origin (Vite proxy).
  */
 export function createChatSocket(token) {
   if (typeof window === "undefined" || !token) return null;
-  return io(window.location.origin, {
+  const base = import.meta.env.VITE_API_URL ?? "";
+  const socketOrigin = base ? base.replace(/\/api\/?$/, "") : window.location.origin;
+  return io(socketOrigin, {
     path: "/socket.io",
     auth: { token },
   });

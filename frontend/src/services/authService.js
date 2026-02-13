@@ -14,7 +14,9 @@
  * --------------------------------------------------
  */
 
-const API_URL = "/api/auth";
+// Use VITE_API_URL in production (e.g. https://your-app.onrender.com/api); relative /api for dev proxy
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const API_URL = BASE ? `${BASE}/auth` : "/api/auth";
 const REQUEST_TIMEOUT_MS = 10000; // 10 seconds
 
 /**

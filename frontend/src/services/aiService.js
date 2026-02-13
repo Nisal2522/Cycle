@@ -9,7 +9,8 @@ import axios from "axios";
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
 export async function sendAiChat(message, history = []) {
-  const { data } = await axios.post(`${BASE}/api/ai/chat`, { message, history }, {
+  const url = BASE ? `${BASE}/ai/chat` : "/api/ai/chat";
+  const { data } = await axios.post(url, { message, history }, {
     timeout: 30000,
     headers: { "Content-Type": "application/json" },
   });
@@ -21,7 +22,7 @@ export async function sendAiChat(message, history = []) {
  * onError(err) on failure. Only invoke from user Send — no socket/typing.
  */
 export async function sendAiChatStream(message, history = [], { onChunk, onDone, onError }) {
-  const url = `${BASE}/api/ai/chat/stream`;
+  const url = BASE ? `${BASE}/ai/chat/stream` : "/api/ai/chat/stream";
   try {
     const res = await fetch(url, {
       method: "POST",
