@@ -33,22 +33,14 @@ import { setupChatSocket } from "./socket/chatSocket.js";
 // Load environment variables
 dotenv.config();
 
-// Connect to MongoDB (uses process.env.MONGO_URI)
+// Connect to MongoDB
 connectDB();
 
 const app = express();
 
-// ── CORS: allow frontend origin(s). Vercel app + optional FRONTEND_ORIGIN (comma-separated).
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://cycle-rose-tau.vercel.app",
-  ...(process.env.FRONTEND_ORIGIN ? process.env.FRONTEND_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean) : []),
-];
+// ── Global middleware ──
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(null, false);
-  },
+  origin: "http://localhost:5173", // Vite dev server
   credentials: true,
 }));
 // Stripe webhook needs raw body for signature verification (must be before express.json)
@@ -84,12 +76,12 @@ app.get("/api/admin-check", (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-// ── HTTP server (for Socket.io attachment). Use process.env.PORT for deployment (Render, Heroku, etc.). ──
+// ── HTTP server (for Socket.io attachment) ──
 const PORT = process.env.PORT || 5000;
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: allowedOrigins, credentials: true },
+  cors: { origin: "http://localhost:5173", credentials: true },
   path: "/socket.io",
 });
 app.set("io", io);

@@ -21,8 +21,11 @@
  * --------------------------------------------------
  */
 
+import { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
+
+const THEME_STORAGE_KEY = "cycle-theme";
 
 // Pages
 import LandingPage from "./pages/LandingPage";
@@ -68,7 +71,7 @@ function DashboardContent() {
 
   return (
     <div
-      className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50"
+      className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-300"
       style={{ "--sidebar-w": `${sidebarWidth}px` }}
     >
       {/* Desktop sidebar (hidden below md via its own CSS) */}
@@ -104,8 +107,19 @@ export default function App() {
   const location = useLocation();
   const { user } = useAuth();
 
+  // Apply saved theme to document on mount so dark mode affects all pages immediately
+  useEffect(() => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    const root = document.documentElement;
+    if (saved === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+  }, []);
+
   return (
-    <>
+    <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300">
       <ChatBot />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
@@ -203,6 +217,6 @@ export default function App() {
         />
       </Routes>
     </AnimatePresence>
-    </>
+    </div>
   );
 }

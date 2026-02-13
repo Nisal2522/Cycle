@@ -16,8 +16,8 @@
 
 import axios from "axios";
 
-// In dev, use relative /api so Vite proxies to backend (localhost:5000)
-const API_BASE = import.meta.env.DEV ? "/api" : "http://localhost:5000/api";
+// Use VITE_API_URL from .env, or /api (Vite proxy in dev / same-origin in prod)
+const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
 function authHeader(token) {
   return { headers: { Authorization: `Bearer ${token}` } };
