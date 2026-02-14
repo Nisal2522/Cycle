@@ -8,6 +8,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import { motion } from "framer-motion";
 import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import { sendAiChatStream } from "../services/aiService";
 
@@ -27,6 +28,8 @@ export default function ChatBot() {
   const isSendingRef = useRef(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const constraintsRef = useRef(null);
+  const didDragRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,20 +117,35 @@ export default function ChatBot() {
 
   return (
     <>
-      {/* Floating button — above mobile bottom nav on small screens */}
-      <button
+      {/* Viewport-sized constraint so the button stays on screen when dragged */}
+      <div ref={constraintsRef} className="fixed inset-0 pointer-events-none z-[9998]" aria-hidden />
+      {/* Draggable floating button — purple circle, white icon; click opens chat, drag repositions */}
+      <motion.button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-20 right-4 z-[9998] flex h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg transition hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 md:bottom-6 md:right-6"
+        drag
+        dragConstraints={constraintsRef}
+        dragElastic={0.1}
+        dragMomentum={false}
+        onDragStart={() => { didDragRef.current = true; }}
+        onDragEnd={() => { /* position stays where dropped */ }}
+        onClick={() => {
+          if (didDragRef.current) {
+            didDragRef.current = false;
+            return;
+          }
+          setOpen((o) => !o);
+        }}
+        className="fixed bottom-20 right-4 z-[9999] flex h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg transition hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 md:bottom-6 md:right-6 cursor-grab active:cursor-grabbing touch-none md:touch-auto"
+        style={{ pointerEvents: "auto" }}
         aria-label={open ? "Close chat" : "Open AI assistant"}
       >
-        <MessageCircle className="h-7 w-7 text-white" />
-      </button>
+        <MessageCircle className="h-7 w-7 text-white pointer-events-none" />
+      </motion.button>
 
       {/* Popup — above button and mobile nav */}
       {open && (
         <div
-          className="fixed bottom-[5.5rem] right-4 z-[9999] flex w-[min(calc(100vw-2rem),400px)] flex-col overflow-hidden rounded-2xl border border-primary-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-2xl md:bottom-24 md:right-6"
+          className="fixed bottom-[5.5rem] right-4 z-[10000] flex w-[min(calc(100vw-2rem),400px)] flex-col overflow-hidden rounded-2xl border border-primary-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-2xl md:bottom-24 md:right-6"
           style={{ maxHeight: "min(70vh, 520px)" }}
         >
           {/* Header */}
