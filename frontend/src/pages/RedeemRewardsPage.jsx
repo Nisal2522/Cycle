@@ -13,7 +13,7 @@
  * --------------------------------------------------
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -31,7 +31,8 @@ import {
   Clock,
   AlertCircle,
 } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
+import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
 import useAuth from "../hooks/useAuth";
 import { getPartnerShops, getShopRewards } from "../services/cyclistService";
@@ -136,8 +137,11 @@ export default function RedeemRewardsPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [modalPartner, setModalPartner] = useState(null);
 
-  // QR
+  // QR: reward + generated transaction/expiry for payload
   const [qrReward, setQrReward] = useState(null);
+  const [qrTransactionId, setQrTransactionId] = useState("");
+  const [qrExpiryTime, setQrExpiryTime] = useState("");
+  const qrCanvasRef = useRef(null);
 
   /* ── Fetch shops on mount ── */
   useEffect(() => {
@@ -167,6 +171,8 @@ export default function RedeemRewardsPage() {
     setModalRewards([]);
     setModalPartner(null);
     setQrReward(null);
+    setQrTransactionId("");
+    setQrExpiryTime("");
     try {
       const { partner, rewards } = await getShopRewards(shop._id);
       setModalPartner(partner);
@@ -182,25 +188,57 @@ export default function RedeemRewardsPage() {
   const closeModal = () => {
     setSelectedShop(null);
     setQrReward(null);
+    setQrTransactionId("");
+    setQrExpiryTime("");
   };
 
-  /* ── Generate QR for a reward ── */
+  const closeQrView = () => {
+    setQrReward(null);
+    setQrTransactionId("");
+    setQrExpiryTime("");
+  };
+
+  /* ── Generate unique transaction ID ── */
+  const generateTransactionId = () =>
+    `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+  /* ── Generate QR for a reward (sets transactionId + expiryTime) ── */
   const handleRedeem = (reward) => {
     setQrReward(reward);
+    setQrTransactionId(generateTransactionId());
+    const expiry = new Date(Date.now() + 15 * 60 * 1000);
+    setQrExpiryTime(expiry.toISOString());
   };
 
-  /* ── QR payload ── */
-  const buildQrPayload = (reward) =>
-    JSON.stringify({
-      type: "REDEEM_REWARD",
-      cyclistId: user?._id,
-      cyclistName: user?.name,
-      partnerId: selectedShop?._id,
-      rewardId: reward._id,
-      rewardTitle: reward.title,
-      tokenCost: reward.tokenCost,
-      ts: Date.now(),
+  /* ── QR payload: transactionId, mealName, tokenAmount, cyclistName, cyclistId, expiryTime ── */
+  const buildQrPayload = () => {
+    if (!qrReward) return "";
+    return JSON.stringify({
+      transactionId: qrTransactionId,
+      mealName: qrReward.title,
+      tokenAmount: qrReward.tokenCost,
+      cyclistName: user?.name ?? "",
+      cyclistId: user?._id ?? "",
+      expiryTime: qrExpiryTime,
     });
+  };
+
+  /* ── Download QR as PNG ── */
+  const handleDownloadQr = () => {
+    const canvas = qrCanvasRef.current;
+    if (!canvas) {
+      toast.error("QR code not ready");
+      return;
+    }
+    canvas.toBlob(
+      (blob) => {
+        if (blob) saveAs(blob, `reward-qr-${qrTransactionId || "redeem"}.png`);
+        else toast.error("Could not create image");
+      },
+      "image/png",
+      1.0
+    );
+  };
 
   return (
     <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50">
@@ -421,10 +459,10 @@ export default function RedeemRewardsPage() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="flex flex-col items-center text-center py-4"
+                      className="flex flex-col items-center py-4"
                     >
-                      <div className="mb-4">
-                        <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full mb-3">
+                      <div className="text-center mb-4">
+                        <div className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-bold px-3 py-1.5 rounded-full mb-3">
                           <QrCode className="w-3.5 h-3.5" />
                           Scan to Redeem
                         </div>
@@ -436,25 +474,61 @@ export default function RedeemRewardsPage() {
                         </p>
                       </div>
 
-                      <div className="bg-white p-4 rounded-2xl border-2 border-dashed border-slate-200 shadow-inner">
-                        <QRCodeSVG
-                          value={buildQrPayload(qrReward)}
+                      <div className="bg-white p-4 rounded-2xl border-2 border-primary/20 shadow-inner">
+                        <QRCodeCanvas
+                          ref={qrCanvasRef}
+                          value={buildQrPayload()}
                           size={200}
                           level="H"
                           includeMargin
                           bgColor="#ffffff"
-                          fgColor="#0f172a"
+                          fgColor="#870f53"
                         />
                       </div>
 
-                      <div className="mt-4 flex items-center gap-2 text-sm">
-                        <Coins className="w-4 h-4 text-amber-500" />
-                        <span className="font-bold text-slate-700">{qrReward.tokenCost} tokens</span>
-                        <span className="text-slate-400">will be deducted</span>
+                      <button
+                        onClick={handleDownloadQr}
+                        className="mt-4 flex items-center justify-center gap-2 w-full max-w-[200px] px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        Download QR Code
+                      </button>
+
+                      {/* Meal / reward details — purple/white theme */}
+                      <div className="mt-6 w-full rounded-2xl border border-primary/20 bg-primary/5 overflow-hidden">
+                        <div className="bg-primary/10 px-4 py-2.5 border-b border-primary/20">
+                          <p className="text-xs font-bold text-primary uppercase tracking-wide">Redemption details</p>
+                        </div>
+                        <ul className="divide-y divide-primary/10 p-0">
+                          <li className="flex justify-between items-center px-4 py-2.5 text-sm">
+                            <span className="text-slate-500 font-medium">Transaction ID</span>
+                            <span className="text-slate-800 font-mono text-xs truncate max-w-[160px]" title={qrTransactionId}>{qrTransactionId}</span>
+                          </li>
+                          <li className="flex justify-between items-center px-4 py-2.5 text-sm">
+                            <span className="text-slate-500 font-medium">Reward / Meal</span>
+                            <span className="text-slate-800 font-semibold truncate max-w-[160px]">{qrReward.title}</span>
+                          </li>
+                          <li className="flex justify-between items-center px-4 py-2.5 text-sm">
+                            <span className="text-slate-500 font-medium">Token amount</span>
+                            <span className="text-slate-800 font-bold text-primary">{qrReward.tokenCost} tokens</span>
+                          </li>
+                          <li className="flex justify-between items-center px-4 py-2.5 text-sm">
+                            <span className="text-slate-500 font-medium">Cyclist name</span>
+                            <span className="text-slate-800 font-medium truncate max-w-[160px]">{user?.name || "—"}</span>
+                          </li>
+                          <li className="flex justify-between items-center px-4 py-2.5 text-sm">
+                            <span className="text-slate-500 font-medium">Cyclist ID</span>
+                            <span className="text-slate-800 font-mono text-xs truncate max-w-[160px]" title={user?._id}>{user?._id || "—"}</span>
+                          </li>
+                          <li className="flex justify-between items-center px-4 py-2.5 text-sm">
+                            <span className="text-slate-500 font-medium">Expires</span>
+                            <span className="text-slate-800 text-xs">{qrExpiryTime ? new Date(qrExpiryTime).toLocaleString() : "—"}</span>
+                          </li>
+                        </ul>
                       </div>
 
                       <button
-                        onClick={() => setQrReward(null)}
+                        onClick={closeQrView}
                         className="mt-5 px-5 py-2 rounded-xl bg-slate-100 text-sm font-semibold text-slate-600 hover:bg-slate-200 transition-colors"
                       >
                         Back to Rewards

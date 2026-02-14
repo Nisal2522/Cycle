@@ -39,6 +39,7 @@ import WeatherPage from "./pages/WeatherPage";
 import PartnerDashboard from "./pages/PartnerDashboard";
 import ShopProfile from "./pages/partner/ShopProfile";
 import EarningsPage from "./pages/partner/EarningsPage";
+import PartnerScanPage from "./pages/partner/PartnerScanPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminRouteOverviewPage from "./pages/AdminRouteOverviewPage";
 import RedeemRewardsPage from "./pages/RedeemRewardsPage";
@@ -180,6 +181,7 @@ export default function App() {
           }
         >
           <Route index element={<PartnerDashboard />} />
+          <Route path="scan" element={<PartnerScanPage />} />
           <Route path="shop-profile" element={<ShopProfile />} />
           <Route path="earnings" element={<EarningsPage />} />
           <Route path="messages" element={<ChatPage />} />

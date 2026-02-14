@@ -176,3 +176,80 @@ export async function redeemTokens(req, res) {
   });
 }
 
+/**
+ * @desc    Confirm checkout from scanned QR (transactionId, mealName, tokenAmount, cyclistId, cyclistName, expiryTime)
+ * @route   POST /api/redeem/confirm
+ * @body    { transactionId, mealName, tokenAmount, cyclistId, cyclistName, expiryTime }
+ */
+export async function confirmRedeem(req, res) {
+  ensurePartner(req, res);
+  const { transactionId, mealName, tokenAmount, cyclistId, cyclistName, expiryTime } = req.body;
+
+  if (!transactionId || !cyclistId || tokenAmount == null) {
+    res.status(400);
+    throw new Error("transactionId, cyclistId, and tokenAmount are required");
+  }
+
+  const tokens = Number(tokenAmount);
+  if (!Number.isFinite(tokens) || tokens <= 0) {
+    res.status(400);
+    throw new Error("tokenAmount must be a positive number");
+  }
+
+  // Already used?
+  const existing = await Redemption.findOne({ transactionId });
+  if (existing) {
+    res.status(400);
+    throw new Error("This QR code has already been used");
+  }
+
+  // Expired?
+  if (expiryTime) {
+    const expiry = new Date(expiryTime);
+    if (Number.isNaN(expiry.getTime()) || expiry < new Date()) {
+      res.status(400);
+      throw new Error("This QR code has expired");
+    }
+  }
+
+  const cyclist = await User.findById(cyclistId);
+  if (!cyclist || cyclist.role !== "cyclist") {
+    res.status(404);
+    throw new Error("Cyclist not found");
+  }
+
+  if (cyclist.tokens < tokens) {
+    res.status(400);
+    throw new Error("Cyclist does not have enough tokens");
+  }
+
+  cyclist.tokens -= tokens;
+  await cyclist.save();
+
+  const partner = await User.findById(req.user._id);
+  if (partner) {
+    partner.partnerTotalRedemptions = (partner.partnerTotalRedemptions || 0) + 1;
+    await partner.save();
+  }
+
+  await Redemption.create({
+    partnerId: req.user._id,
+    cyclistId: cyclist._id,
+    tokens,
+    transactionId,
+    itemName: mealName || null,
+  });
+
+  res.status(200).json({
+    message: "Checkout completed",
+    status: "Completed",
+    transactionId,
+    redeemedTokens: tokens,
+    cyclist: {
+      _id: cyclist._id,
+      name: cyclist.name,
+      tokens: cyclist.tokens,
+    },
+  });
+}
+

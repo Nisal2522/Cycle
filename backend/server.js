@@ -18,6 +18,7 @@ import cyclistRoutes from "./routes/cyclistRoutes.js";
 import hazardRoutes from "./routes/hazardRoutes.js";
 import rewardRoutes from "./routes/rewardRoutes.js";
 import tokenRoutes from "./routes/tokenRoutes.js";
+import redeemRoutes from "./routes/redeemRoutes.js";
 import partnerRoutes from "./routes/partnerRoutes.js";
 import routeRoutes from "./routes/routeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
@@ -28,6 +29,7 @@ import { stripeWebhook } from "./controllers/paymentController.js";
 import asyncHandler from "express-async-handler";
 import { protect } from "./middleware/authMiddleware.js";
 import { getRides } from "./controllers/cyclistController.js";
+import { getCheckouts } from "./controllers/partnerController.js";
 import { setupChatSocket } from "./socket/chatSocket.js";
 
 // Load environment variables
@@ -66,6 +68,8 @@ app.use("/api/cyclist", cyclistRoutes);
 app.use("/api/hazards", hazardRoutes);
 app.use("/api/rewards", rewardRoutes);
 app.use("/api/tokens", tokenRoutes);
+app.use("/api/redeem", redeemRoutes);
+app.get("/api/partner/checkouts", protect, asyncHandler(getCheckouts));
 app.use("/api/partner", partnerRoutes);
 app.use("/api/routes", routeRoutes);
 app.use("/api/payments", paymentRoutes);

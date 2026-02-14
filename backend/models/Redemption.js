@@ -30,11 +30,22 @@ const redemptionSchema = new mongoose.Schema(
       required: true,
       min: 1,
     },
+    transactionId: {
+      type: String,
+      sparse: true,
+      unique: true,
+      default: null,
+    },
+    itemName: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
 redemptionSchema.index({ partnerId: 1, createdAt: -1 });
+redemptionSchema.index({ transactionId: 1 }, { unique: true, sparse: true });
 
 const Redemption = mongoose.model("Redemption", redemptionSchema);
 export default Redemption;

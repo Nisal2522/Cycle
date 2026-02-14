@@ -13,6 +13,7 @@ import { v2 as cloudinary } from "cloudinary";
 import User from "../models/User.js";
 import Payout from "../models/Payout.js";
 import PayoutRequest from "../models/PayoutRequest.js";
+import Redemption from "../models/Redemption.js";
 
 function ensurePartner(req, res) {
   if (!req.user || req.user.role !== "partner") {
@@ -213,4 +214,42 @@ export async function createPayoutRequest(req, res) {
   });
 
   res.status(201).json(request);
+}
+
+/**
+ * @desc    Get partner's recent checkouts (redemptions) with pagination
+ * @route   GET /api/partner/checkouts?page=1&limit=1
+ * @query   page (default 1), limit (default 1)
+ * @access  Private (partner only)
+ */
+export async function getCheckouts(req, res) {
+  ensurePartner(req, res);
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 1));
+
+  const total = await Redemption.countDocuments({ partnerId: req.user._id });
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const skip = (page - 1) * limit;
+
+  const checkouts = await Redemption.find({ partnerId: req.user._id })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate("cyclistId", "name")
+    .lean();
+
+  res.json({
+    checkouts: checkouts.map((r) => ({
+      transactionId: r.transactionId || r._id.toString(),
+      cyclistName: r.cyclistId?.name ?? "—",
+      itemName: r.itemName ?? "—",
+      tokens: r.tokens,
+      dateTime: r.createdAt,
+    })),
+    total,
+    page,
+    limit,
+    totalPages,
+  });
 }

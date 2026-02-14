@@ -40,7 +40,7 @@ const NAV_LINKS_BY_ROLE = {
   ],
   partner: [
     { label: "Dashboard", to: "/partner-dashboard" },
-    { label: "Scan QR", to: "/partner-dashboard" },
+    { label: "Scan QR", to: "/partner-dashboard/scan" },
     { label: "Earnings", to: "/partner-dashboard/earnings" },
     { label: "Messages", to: "/partner-dashboard/messages" },
   ],
@@ -70,7 +70,7 @@ export const ROLE_NAV = {
   ],
   partner: [
     { to: "/partner-dashboard", label: "Shop", icon: Store },
-    { to: "/partner-dashboard", label: "Scan QR", icon: QrCode },
+    { to: "/partner-dashboard/scan", label: "Scan QR", icon: QrCode },
     { to: "/partner-dashboard/earnings", label: "Earnings", icon: DollarSign },
     { to: "/partner-dashboard/messages", label: "Messages", icon: MessageCircle },
     { to: "/partner-dashboard", label: "Promos", icon: Megaphone },

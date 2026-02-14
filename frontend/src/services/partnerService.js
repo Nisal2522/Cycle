@@ -89,6 +89,16 @@ export async function redeemTokens(token, { cyclistId, tokens }) {
   return data;
 }
 
+/** Confirm checkout from scanned QR payload (partner). */
+export async function confirmRedeem(token, payload) {
+  const { data } = await axios.post(
+    `${API_BASE}/redeem/confirm`,
+    payload,
+    authHeader(token)
+  );
+  return data;
+}
+
 export async function getMyPayouts(token) {
   const { data } = await axios.get(`${API_BASE}/partner/payouts`, authHeader(token));
   return data;
@@ -106,6 +116,15 @@ export async function createPayoutRequest(token, amount) {
     `${API_BASE}/partner/payout-requests`,
     { amount },
     authHeader(token)
+  );
+  return data;
+}
+
+/** Get partner's recent checkouts with pagination. */
+export async function getPartnerCheckouts(token, { page = 1, limit = 1 } = {}) {
+  const { data } = await axios.get(
+    `${API_BASE}/partner/checkouts`,
+    { params: { page, limit }, ...authHeader(token) }
   );
   return data;
 }
