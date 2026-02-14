@@ -21,6 +21,8 @@ import {
   CheckCheck,
   Pencil,
   Trash2,
+  Menu,
+  X,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 import { updateProfile } from "../services/authService";
@@ -241,6 +243,7 @@ export default function ChatPage() {
   const [startChatOpen, setStartChatOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
@@ -471,32 +474,113 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-0px)] md:h-[calc(100dvh-0px)] w-full max-w-full flex flex-col bg-slate-100/80">
+    <div className="h-screen min-h-[100dvh] w-full max-w-full flex flex-col bg-slate-100/80 overflow-hidden">
       {/* Header bar */}
       <div className="shrink-0 h-14 px-4 flex items-center justify-between bg-white border-b border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Hamburger: mobile only — toggles chat list drawer */}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="md:hidden p-2 -ml-2 rounded-xl hover:bg-slate-100 transition-colors"
+            aria-label={sidebarOpen ? "Close chat list" : "Open chat list"}
+          >
+            <Menu className="w-6 h-6 text-slate-600" />
+          </button>
+          <div className="w-10 h-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
             <MessageCircle className="w-5 h-5 text-primary" />
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-800">Messages</h1>
-            <p className="text-xs text-slate-500">Chat with cyclists and partners</p>
+          <div className="min-w-0 hidden sm:block">
+            <h1 className="text-lg font-bold text-slate-800 truncate">Messages</h1>
+            <p className="text-xs text-slate-500 truncate">Chat with cyclists and partners</p>
           </div>
         </div>
         <button
           type="button"
           onClick={() => setProfileModalOpen(true)}
-          className="p-2 rounded-xl hover:bg-slate-100 transition-colors"
+          className="p-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
           aria-label="Profile settings"
         >
           <Avatar user={user} size="sm" />
         </button>
       </div>
 
-      <div className="flex-1 flex min-h-0 w-full">
-        {/* Left: chat list */}
-        <div className="w-full sm:w-80 md:w-96 shrink-0 flex flex-col bg-white border-r border-slate-200">
-          <div className="p-2 flex gap-2 border-b border-slate-100">
+      {/* Main: flex-col on mobile (chat window only in flow), md:flex-row (list + window) */}
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 w-full relative overflow-hidden">
+        {/* Mobile: drawer overlay for chat list */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/40 z-40 md:hidden"
+                onClick={() => setSidebarOpen(false)}
+                aria-hidden
+              />
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "tween", duration: 0.2 }}
+                className="fixed left-0 top-0 bottom-0 w-[min(320px,85vw)] max-w-full flex flex-col bg-white border-r border-slate-200 shadow-xl z-50 md:hidden"
+              >
+                <div className="shrink-0 p-2 flex items-center justify-between border-b border-slate-100">
+                  <span className="font-semibold text-slate-800">Chats</span>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarOpen(false)}
+                    className="p-2 rounded-lg hover:bg-slate-100"
+                    aria-label="Close"
+                  >
+                    <X className="w-5 h-5 text-slate-600" />
+                  </button>
+                </div>
+                <div className="p-2 flex gap-2 border-b border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => { setStartChatOpen(true); }}
+                    className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    New Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCreateGroupOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-colors"
+                  >
+                    <Users className="w-4 h-4" />
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  {loadingChats ? (
+                    <div className="flex items-center justify-center h-32">
+                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    </div>
+                  ) : (
+                    <ChatList
+                      chats={chats}
+                      selectedChat={selectedChat}
+                      onSelect={(chat) => {
+                        setSelectedChat(chat);
+                        setSidebarOpen(false);
+                      }}
+                      currentUserId={currentUserId}
+                      onlineUserIds={onlineUserIds}
+                    />
+                  )}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Desktop: left sidebar (chat list) — visible md and up */}
+        <div className="hidden md:flex md:w-96 shrink-0 flex-col bg-white border-r border-slate-200 min-h-0">
+          <div className="p-2 flex gap-2 border-b border-slate-100 shrink-0">
             <button
               type="button"
               onClick={() => setStartChatOpen(true)}
@@ -511,12 +595,12 @@ export default function ChatPage() {
               className="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-colors"
             >
               <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Group</span>
+              Group
               <Plus className="w-4 h-4" />
             </button>
           </div>
           {loadingChats ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center min-h-0">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
             </div>
           ) : (
@@ -530,17 +614,17 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Right: message area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white">
+        {/* Right: message area — 100% width on mobile, flex-1 on desktop */}
+        <div className="flex-1 flex flex-col min-w-0 w-full md:min-w-0 bg-white min-h-0">
           {!selectedChat ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 min-h-0">
               <MessageCircle className="w-16 h-16 text-slate-300 mb-4" />
               <p className="text-sm font-medium">Select a chat or start a new one</p>
-              <p className="text-xs mt-1">Create a group to chat with multiple people</p>
+              <p className="text-xs mt-1">Tap the menu to open your chats</p>
             </div>
           ) : (
             <>
-              <div className="shrink-0 h-14 px-4 flex items-center gap-3 border-b border-slate-200 bg-white">
+              <div className="shrink-0 h-14 px-3 md:px-4 flex items-center gap-3 border-b border-slate-200 bg-white">
                 <Avatar
                   user={selectedChat.users?.find((u) => u._id !== currentUserId) || (selectedChat.isGroupChat ? {} : null)}
                   size="md"
@@ -549,12 +633,12 @@ export default function ChatPage() {
                 />
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-slate-800 truncate">{getChatDisplayName(selectedChat)}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 truncate">
                     {typingUserId ? "typing..." : selectedChat.isGroupChat ? `${selectedChat.users?.length || 0} members` : (onlineUserIds.includes(selectedChat.users?.find((u) => u._id !== currentUserId)?._id) ? "Active" : "Offline")}
                   </p>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-50/50 to-white">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-3 bg-gradient-to-b from-slate-50/50 to-white">
                 {loadingMessages ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -584,7 +668,7 @@ export default function ChatPage() {
                   </p>
                 </div>
               )}
-              <div className="shrink-0 p-3 border-t border-slate-200 bg-white">
+              <div className="shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-slate-200 bg-white">
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -595,13 +679,13 @@ export default function ChatPage() {
                     }}
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
                     placeholder="Type a message..."
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    className="flex-1 min-w-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                   <button
                     type="button"
                     onClick={sendMessage}
                     disabled={!input.trim()}
-                    className="p-2.5 rounded-xl bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                    className="p-2.5 shrink-0 rounded-xl bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
                   >
                     <Send className="w-5 h-5" />
                   </button>
