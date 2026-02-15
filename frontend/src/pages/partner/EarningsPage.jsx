@@ -62,12 +62,12 @@ export default function EarningsPage() {
           </div>
         </motion.div>
 
-        {/* Available balance + Request payout */}
+        {/* Available balance + Request payout — 3D card, increased back shadow */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="mb-8 bg-white rounded-2xl border border-slate-100 shadow-sm px-6 py-5 sm:px-8 sm:py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6"
+          className="mb-8 bg-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.08),0_10px_25px_rgba(0,0,0,0.05)] border-t border-white/30 px-6 py-5 sm:px-8 sm:py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6"
         >
           <div className="flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
@@ -149,7 +149,7 @@ export default function EarningsPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="w-full bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"
+          className="w-full bg-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.08),0_10px_25px_rgba(0,0,0,0.05)] border-t border-white/30 overflow-hidden"
         >
           <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center gap-3">
             <Receipt className="w-5 h-5" style={{ color: MAROON }} />

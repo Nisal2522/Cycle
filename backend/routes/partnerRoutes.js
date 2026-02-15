@@ -20,6 +20,8 @@ import {
   getEarningsSummary,
   createPayoutRequest,
   getCheckouts,
+  getScanStats,
+  getRecentRedemptions,
 } from "../controllers/partnerController.js";
 
 const router = express.Router();
@@ -33,6 +35,8 @@ router.post("/upload-image", protect, asyncHandler(uploadShopImage));
 router.get("/payouts", protect, asyncHandler(getMyPayouts));
 router.get("/earnings", protect, asyncHandler(getEarningsSummary));
 router.get("/checkouts", protect, asyncHandler(getCheckouts));
+router.get("/scan-stats", protect, asyncHandler(getScanStats));
+router.get("/recent-redemptions", protect, asyncHandler(getRecentRedemptions));
 router.post("/payout-requests", protect, asyncHandler(createPayoutRequest));
 
 export default router;

@@ -15,7 +15,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  QrCode,
   BarChart3,
   Store,
   Users,
@@ -31,6 +30,7 @@ import {
   Gift,
   Sparkles,
   CheckCircle2,
+  Calendar,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 import {
@@ -38,7 +38,7 @@ import {
   createReward,
   updateReward,
   deleteReward,
-  redeemTokens,
+  getPartnerRecentRedemptions,
 } from "../services/partnerService";
 
 const fadeIn = {
@@ -50,12 +50,21 @@ const fadeIn = {
   }),
 };
 
-const dummyRedemptions = [
-  { customer: "Alex M.", tokens: 50, time: "2 min ago" },
-  { customer: "Sara K.", tokens: 120, time: "15 min ago" },
-  { customer: "Raj P.", tokens: 30, time: "1 hour ago" },
-  { customer: "Emma L.", tokens: 80, time: "3 hours ago" },
-];
+function timeAgo(date) {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  const now = new Date();
+  const sec = Math.floor((now - d) / 1000);
+  if (sec < 60) return "Just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr !== 1 ? "s" : ""} ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day} day${day !== 1 ? "s" : ""} ago`;
+  return d.toLocaleDateString();
+}
 
 export default function PartnerDashboard() {
   const { user, token } = useAuth();
@@ -72,11 +81,8 @@ export default function PartnerDashboard() {
   });
   const [formError, setFormError] = useState("");
 
-  const [redeemCode, setRedeemCode] = useState("");
-  const [redeemTokensAmount, setRedeemTokensAmount] = useState("50");
-  const [redeemResult, setRedeemResult] = useState("");
-  const [redeemError, setRedeemError] = useState("");
-  const [redeeming, setRedeeming] = useState(false);
+  const [recentRedemptions, setRecentRedemptions] = useState([]);
+  const [loadingRecentRedemptions, setLoadingRecentRedemptions] = useState(true);
 
   // For greeting, show the partner's account name from signup
   const partnerDisplayName = useMemo(
@@ -136,6 +142,27 @@ export default function PartnerDashboard() {
       cancelled = true;
     };
   }, [token, user?._id]);
+
+  const fetchRecentRedemptions = () => {
+    if (!token) return;
+    setLoadingRecentRedemptions(true);
+    getPartnerRecentRedemptions(token, { limit: 5 })
+      .then((data) => setRecentRedemptions(data?.redemptions ?? []))
+      .catch(() => setRecentRedemptions([]))
+      .finally(() => setLoadingRecentRedemptions(false));
+  };
+
+  useEffect(() => {
+    fetchRecentRedemptions();
+  }, [token]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && token) fetchRecentRedemptions();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [token]);
 
   const resetForm = () => {
     setEditingReward(null);
@@ -205,40 +232,6 @@ export default function PartnerDashboard() {
       setRewards((prev) => prev.filter((r) => r._id !== rewardId));
     } catch {
       // ignore for now; you could surface a toast here
-    }
-  };
-
-  const handleRedeem = async (e) => {
-    e.preventDefault();
-    setRedeemResult("");
-    setRedeemError("");
-    if (!token) return;
-    if (!redeemCode.trim()) {
-      setRedeemError("Please enter a cyclist ID.");
-      return;
-    }
-    const tokensNum = Number(redeemTokensAmount);
-    if (!tokensNum || tokensNum <= 0) {
-      setRedeemError("Please enter a valid token amount.");
-      return;
-    }
-
-    setRedeeming(true);
-    try {
-      const data = await redeemTokens(token, {
-        cyclistId: redeemCode.trim(),
-        tokens: tokensNum,
-      });
-      setRedeemResult(
-        `Redeemed ${data.redeemedTokens} tokens from ${data.cyclist.name}. Remaining balance: ${data.cyclist.tokens}.`
-      );
-      // Note: partnerTotalRedemptions is updated on backend; would normally refresh profile here.
-    } catch (err) {
-      setRedeemError(
-        err.response?.data?.message || "Failed to redeem tokens. Please try again."
-      );
-    } finally {
-      setRedeeming(false);
     }
   };
 
@@ -339,6 +332,7 @@ export default function PartnerDashboard() {
 
             {/* ── Create reward form ── */}
             <form
+              id="reward-form"
               onSubmit={handleSubmitReward}
               className="px-5 sm:px-6 py-4 sm:py-5 bg-slate-50/70 border-b border-slate-100"
             >
@@ -422,245 +416,165 @@ export default function PartnerDashboard() {
               )}
             </form>
 
-            {/* ── Active Rewards table ── */}
+            {/* ── Active Rewards: responsive grid of atomic cards ── */}
             <div className="px-5 sm:px-6 py-4 flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-bold text-slate-800">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
                   Active Rewards
                 </h3>
                 {!loadingRewards && rewards.length > 0 && (
-                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full">
                     {rewards.length} {rewards.length === 1 ? "reward" : "rewards"}
                   </span>
                 )}
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm min-w-0">
-                <div className="hidden sm:grid grid-cols-[minmax(0,2fr),90px,100px,80px] gap-4 px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
-                  <span>Reward</span>
-                  <span>Cost</span>
-                  <span>Expiry</span>
-                  <span className="text-right">Actions</span>
+              {loadingRewards ? (
+                <div className="flex flex-col items-center justify-center py-14 gap-3">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <p className="text-sm font-medium text-slate-500">Loading rewards…</p>
                 </div>
-                {loadingRewards ? (
-                  <div className="flex flex-col items-center justify-center py-14 gap-3">
-                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                    <p className="text-sm font-medium text-slate-500">Loading rewards…</p>
+              ) : rewards.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-6 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/30">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center mb-4">
+                    <Gift className="w-8 h-8 text-purple-500 dark:text-purple-400" />
                   </div>
-                ) : rewards.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-amber-100 flex items-center justify-center mb-4">
-                      <Coins className="w-7 h-7 text-primary/70" />
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">No rewards yet</p>
-                    <p className="text-xs text-slate-500 mt-1 max-w-[240px]">
-                      Create your first offer above to start accepting token redemptions from cyclists.
-                    </p>
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-slate-100">
-                    {rewards.map((r) => (
-                      <li key={r._id} className="group hover:bg-slate-50/80 transition-colors">
-                        <div className="sm:hidden px-4 py-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-bold text-slate-900 text-sm" title={r.title}>
-                                {r.title}
-                              </p>
-                              {r.description && (
-                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                                  {r.description}
-                                </p>
-                              )}
-                              <div className="flex flex-wrap items-center gap-2 mt-2">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200/60">
-                                  {r.tokenCost} tokens
-                                </span>
-                                <span className="text-xs text-slate-400">
-                                  {r.expiryDate
-                                    ? new Date(r.expiryDate).toLocaleDateString("en-US", {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                      })
-                                    : "No expiry"}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => handleEditReward(r)}
-                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-500 bg-slate-100 hover:bg-primary/10 hover:text-primary transition-all touch-manipulation"
-                                aria-label="Edit reward"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteReward(r._id)}
-                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-400 bg-slate-100 hover:bg-red-50 hover:text-red-500 transition-all touch-manipulation"
-                                aria-label="Delete reward"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="hidden sm:grid grid-cols-[minmax(0,2fr),90px,100px,80px] gap-4 px-4 py-3.5 items-center text-sm">
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 truncate" title={r.title}>
-                              {r.title}
-                            </p>
-                            {r.description && (
-                              <p className="text-xs text-slate-500 truncate mt-0.5" title={r.description}>
-                                {r.description}
-                              </p>
-                            )}
-                          </div>
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200/60 w-fit">
-                            {r.tokenCost}
-                          </span>
-                          <span className="text-slate-500 text-xs font-medium">
+                  <p className="text-base font-bold text-slate-700 dark:text-slate-200">No rewards yet</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-[260px]">
+                    Create your first offer to start accepting token redemptions from cyclists.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById("reward-form")?.scrollIntoView({ behavior: "smooth" })}
+                    className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-semibold shadow-md hover:shadow-lg hover:opacity-95 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create your first reward
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {rewards.map((r) => (
+                    <div
+                      key={r._id}
+                      className="relative overflow-hidden bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-[0_4px_14px_rgba(0,0,0,0.06)] dark:shadow-none border dark:border-slate-700"
+                    >
+                      <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-purple-500 to-indigo-500" aria-hidden />
+                      <div className="flex items-start justify-between gap-3 pt-0.5">
+                        <h4 className="text-lg font-bold text-slate-800 dark:text-slate-100 truncate flex-1 min-w-0" title={r.title}>
+                          {r.title}
+                        </h4>
+                        <span className="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-200 text-xs font-bold">
+                          {r.tokenCost} tokens
+                        </span>
+                      </div>
+                      {r.description && (
+                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mt-2" title={r.description}>
+                          {r.description}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          <Calendar className="w-3.5 h-3.5 shrink-0" />
+                          <span>
                             {r.expiryDate
                               ? new Date(r.expiryDate).toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric",
                                   year: "numeric",
                                 })
-                              : "—"}
+                              : "No expiry"}
                           </span>
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleEditReward(r)}
-                              className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary transition-all"
-                              aria-label="Edit reward"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteReward(r._id)}
-                              className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all"
-                              aria-label="Delete reward"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditReward(r)}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 transition-all"
+                            aria-label="Edit reward"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReward(r._id)}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all"
+                            aria-label="Delete reward"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* ── Redemption Tool ── */}
-            <div className="mx-5 sm:mx-6 mb-5 sm:mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-primary/5 border border-slate-200/80 shadow-inner">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/10">
-                  <QrCode className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">
-                    Redemption Tool
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Cyclist ID or QR value + token amount
-                  </p>
-                </div>
-              </div>
-              <form
-                onSubmit={handleRedeem}
-                className="flex flex-col sm:flex-row gap-3 sm:items-end"
-              >
-                <div className="flex-1 min-w-0">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Cyclist ID</label>
-                  <input
-                    type="text"
-                    value={redeemCode}
-                    onChange={(e) => setRedeemCode(e.target.value)}
-                    placeholder="Enter ID or scan QR"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm"
-                  />
-                </div>
-                <div className="sm:w-24">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tokens</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={redeemTokensAmount}
-                    onChange={(e) => setRedeemTokensAmount(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={redeeming}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/25 hover:shadow-primary/30 hover:bg-primary/95 active:scale-[0.98] disabled:opacity-60 min-h-[44px] touch-manipulation transition-all"
-                >
-                  {redeeming ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  Redeem
-                </button>
-              </form>
-              {redeemError && (
-                <p className="mt-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2.5 rounded-xl border border-red-100">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>{redeemError}</span>
-                </p>
-              )}
-              {redeemResult && (
-                <p className="mt-3 flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 px-3 py-2.5 rounded-xl border border-emerald-100">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{redeemResult}</span>
-                </p>
-              )}
-            </div>
           </motion.div>
 
-          {/* Recent Redemptions — professional card */}
+          {/* Recent Redemptions — modern activity feed, glassmorphism, purple-pink accents */}
           <motion.div
             custom={6}
             variants={fadeIn}
             initial="hidden"
             animate="visible"
-            className="bg-white rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,0.32)] border border-slate-100 overflow-hidden min-w-0"
+            className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,0.32)] dark:shadow-none border border-white/20 dark:border-slate-700 overflow-hidden min-w-0"
           >
-            <div className="bg-gradient-to-br from-amber-50/80 via-white to-primary/5 border-b border-slate-100 px-4 sm:px-6 pt-4 pb-3">
+            <div className="bg-gradient-to-r from-purple-500/5 to-pink-500/5 dark:from-purple-500/10 dark:to-pink-500/10 border-b border-slate-100 dark:border-slate-700 px-4 sm:px-6 pt-4 pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center border border-amber-200/60 shadow-sm">
-                  <BarChart3 className="w-5 h-5 text-amber-600" />
+                <div className="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center border border-amber-200/60 dark:border-amber-700/40 shadow-sm">
+                  <BarChart3 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800 tracking-tight">Recent Redemptions</h3>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Latest token redemptions at your shop</p>
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">Recent Redemptions</h3>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Latest token redemptions at your shop</p>
                 </div>
               </div>
             </div>
-            <div className="divide-y divide-slate-100">
-              {dummyRedemptions.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 hover:bg-slate-50/80 transition-colors min-w-0"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0 ring-2 ring-white shadow-sm">
-                      {item.customer.charAt(0)}
+            <div className="p-3 sm:p-4 space-y-2.5">
+              {loadingRecentRedemptions ? (
+                [...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-100/50 dark:bg-slate-700/30 min-w-0 animate-pulse"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-600 shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="h-4 w-24 bg-slate-200 dark:bg-slate-600 rounded" />
+                        <div className="h-3 w-16 bg-slate-100 dark:bg-slate-600 rounded" />
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{item.customer}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{item.time}</p>
-                    </div>
+                    <div className="h-7 w-12 bg-slate-200 dark:bg-slate-600 rounded-full shrink-0" />
                   </div>
-                  <span className="shrink-0 inline-flex items-center px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200/60">
-                    −{item.tokens}
-                  </span>
+                ))
+              ) : recentRedemptions.length === 0 ? (
+                <div className="py-10 text-center px-4">
+                  <BarChart3 className="w-10 h-10 text-slate-300 dark:text-slate-500 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No recent redemptions</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Complete a scan to see redemptions here</p>
                 </div>
-              ))}
+              ) : (
+                recentRedemptions.map((item) => (
+                  <div
+                    key={item._id || item.createdAt}
+                    className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600/50 shadow-sm hover:scale-[1.01] hover:shadow-md hover:border-purple-200/60 dark:hover:border-purple-500/30 transition-all duration-200 min-w-0"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/40 dark:to-pink-900/40 flex items-center justify-center text-sm font-bold text-purple-700 dark:text-purple-300 shrink-0 ring-2 ring-white dark:ring-slate-700 shadow-sm">
+                        {(item.cyclistName || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{item.cyclistName || "—"}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">{timeAgo(item.createdAt)}</p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 text-xs font-bold">
+                      −{item.tokens}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </motion.div>
         </div>

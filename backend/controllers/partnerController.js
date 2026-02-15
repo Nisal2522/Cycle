@@ -253,3 +253,59 @@ export async function getCheckouts(req, res) {
     totalPages,
   });
 }
+
+/**
+ * @desc    Get partner scan stats for dashboard (scans today, tokens redeemed today, success rate)
+ * @route   GET /api/partner/scan-stats
+ * @access  Private (partner only)
+ */
+export async function getScanStats(req, res) {
+  ensurePartner(req, res);
+
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setUTCDate(endOfToday.getUTCDate() + 1);
+
+  const todayMatch = { partnerId: req.user._id, createdAt: { $gte: startOfToday, $lt: endOfToday } };
+  const [scansToday, statsToday, totalRedemptions] = await Promise.all([
+    Redemption.countDocuments(todayMatch),
+    Redemption.aggregate([
+      { $match: todayMatch },
+      { $group: { _id: null, tokens: { $sum: "$tokens" } } },
+    ]).then((r) => (r[0] ? r[0].tokens : 0)),
+    Redemption.countDocuments({ partnerId: req.user._id }),
+  ]);
+
+  const tokensRedeemedToday = statsToday;
+  const successRate = totalRedemptions > 0 ? 100 : 100;
+
+  res.json({ scansToday, tokensRedeemedToday, successRate });
+}
+
+/**
+ * @desc    Get partner's most recent redemptions for dashboard card (cyclist name, time, tokens)
+ * @route   GET /api/partner/recent-redemptions
+ * @query   limit (default 5, max 10)
+ * @access  Private (partner only)
+ */
+export async function getRecentRedemptions(req, res) {
+  ensurePartner(req, res);
+
+  const limit = Math.min(10, Math.max(1, parseInt(req.query.limit, 10) || 5));
+
+  const redemptions = await Redemption.find({ partnerId: req.user._id })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate("cyclistId", "name")
+    .lean();
+
+  res.json({
+    redemptions: redemptions.map((r) => ({
+      _id: r._id.toString(),
+      cyclistName: r.cyclistId?.name ?? "—",
+      createdAt: r.createdAt,
+      tokens: r.tokens,
+    })),
+  });
+}

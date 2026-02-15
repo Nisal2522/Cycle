@@ -121,10 +121,25 @@ export async function createPayoutRequest(token, amount) {
 }
 
 /** Get partner's recent checkouts with pagination. */
-export async function getPartnerCheckouts(token, { page = 1, limit = 1 } = {}) {
+export async function getPartnerCheckouts(token, { page = 1, limit = 10 } = {}) {
   const { data } = await axios.get(
     `${API_BASE}/partner/checkouts`,
     { params: { page, limit }, ...authHeader(token) }
+  );
+  return data;
+}
+
+/** Get partner scan stats (scans today, tokens redeemed today, success rate). */
+export async function getPartnerScanStats(token) {
+  const { data } = await axios.get(`${API_BASE}/partner/scan-stats`, authHeader(token));
+  return data;
+}
+
+/** Get partner's most recent redemptions for dashboard card (cyclistName, createdAt, tokens). */
+export async function getPartnerRecentRedemptions(token, { limit = 5 } = {}) {
+  const { data } = await axios.get(
+    `${API_BASE}/partner/recent-redemptions`,
+    { params: { limit }, ...authHeader(token) }
   );
   return data;
 }
