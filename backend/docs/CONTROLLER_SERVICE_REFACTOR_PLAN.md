@@ -71,3 +71,24 @@ Controller  →  Service  →  Model
 - All controllers now delegate to services; no controller imports models (except authController imports only constants.ROLES).
 - Validations: routeValidation.js, hazardValidation.js added; authValidation.js uses constants.ROLES.
 - Models: User.js and Hazard.js import ROLES / HAZARD_TYPES from constants.js for single source of truth.
+
+## Repository Layer Removed (2026-02-16)
+**Decision**: Removed the repository layer as it added unnecessary complexity without providing value.
+
+**Rationale**:
+- Only 2 of 11 models had repositories (18% coverage) - inconsistent implementation
+- Mongoose already provides the Data Mapper pattern - adding repositories creates a "repository of repositories"
+- No abstraction value: only MongoDB is used, no need to swap data sources
+- `paymentRepository.js` was dead code (never imported or used)
+- `userRepository.js` was only used by `partnerService.js` for 4 simple operations
+
+**Changes Made**:
+- Deleted `src/repositories/userRepository.js`
+- Deleted `src/repositories/paymentRepository.js`
+- Deleted `src/repositories/` directory
+- Refactored `partnerService.js` to use Mongoose User model directly (4 operations inlined)
+- Updated `README.md` to document correct Controller → Service → Model architecture
+
+**Current Architecture**: Routes → Controllers → Services → Models (Mongoose)
+
+Services access Mongoose models directly. This is the consistent pattern across all 11 services. Complex or reused queries become service helper functions if needed.

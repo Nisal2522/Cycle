@@ -1,16 +1,19 @@
 # CycleLink Backend API
 
-Node.js/Express backend with **MVC structure**, Mongoose (MongoDB), and JWT auth.
+Node.js/Express backend with **Controller → Service → Model architecture**, Mongoose (MongoDB), and JWT auth.
 
 ---
 
-## MVC Pattern (Clean Code)
+## Architecture Pattern (Clean Code)
 
-| Layer      | Location        | Role |
-|-----------|------------------|------|
-| **Models**    | `models/`        | Mongoose schemas (User, Hazard) |
-| **Controllers** | `controllers/`   | Business logic; handle `req`/`res` |
-| **Routes**     | `routes/`        | HTTP method + path → controller |
+| Layer          | Location         | Responsibility |
+|----------------|------------------|----------------|
+| **Routes**     | `routes/`        | HTTP routing, auth middleware |
+| **Controllers**| `controllers/`   | Parse request, validate input, call service, format response |
+| **Services**   | `services/`      | Business logic, orchestration, DB access |
+| **Models**     | `models/`        | Mongoose schemas, DB validation |
+| **Validations**| `validations/`   | Joi schemas for input validation |
+| **Utils**      | `utils/`         | Shared utilities (tokens, formatters) |
 
 ### API Endpoints (4+)
 

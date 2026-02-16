@@ -1,6 +1,6 @@
 /**
  * src/services/partnerService.js — Partner/Shop business logic (Requirement iii).
- * DB access for profile/bank via userRepository; other reads via models.
+ * DB access via Mongoose models directly (Controller → Service → Model pattern).
  */
 import { v2 as cloudinary } from "cloudinary";
 import User from "../models/User.js";
@@ -8,13 +8,12 @@ import Payout from "../models/Payout.js";
 import PayoutRequest from "../models/PayoutRequest.js";
 import Redemption from "../models/Redemption.js";
 import { TOKEN_VALUE } from "../models/Payout.js";
-import * as userRepository from "../repositories/userRepository.js";
 
 const PARTNER_SELECT =
   "name email role shopName shopImage description location address category phoneNumber partnerTotalRedemptions partnerAvailableBalance bankDetails";
 
 export async function getProfile(partnerId) {
-  const user = await userRepository.findById(partnerId, PARTNER_SELECT);
+  const user = await User.findById(partnerId).select(PARTNER_SELECT).exec();
   if (!user) {
     const err = new Error("User not found");
     err.statusCode = 404;
@@ -48,7 +47,8 @@ export async function getProfile(partnerId) {
  * Get partner bank details only (for GET /api/partner/bank-details).
  */
 export async function getBankDetails(partnerId) {
-  const bd = await userRepository.getBankDetails(partnerId);
+  const user = await User.findById(partnerId).select("bankDetails").lean().exec();
+  const bd = user?.bankDetails || null;
   return {
     bankDetails: {
       bankName: bd?.bankName ?? "",
@@ -60,15 +60,21 @@ export async function getBankDetails(partnerId) {
 }
 
 /**
- * Save or update partner bank details (full or partial). Uses userRepository.
+ * Save or update partner bank details (full or partial).
  */
 export async function updateBankDetails(partnerId, payload) {
-  const user = await userRepository.updateBankDetails(partnerId, payload);
+  const user = await User.findById(partnerId);
   if (!user) {
     const err = new Error("User not found");
     err.statusCode = 404;
     throw err;
   }
+  if (!user.bankDetails) user.bankDetails = {};
+  if (payload.bankName !== undefined) user.bankDetails.bankName = String(payload.bankName).trim();
+  if (payload.branchName !== undefined) user.bankDetails.branchName = String(payload.branchName).trim();
+  if (payload.accountNo !== undefined) user.bankDetails.accountNo = String(payload.accountNo).trim();
+  if (payload.accountHolderName !== undefined) user.bankDetails.accountHolderName = String(payload.accountHolderName).trim();
+  await user.save();
   const bd = user.bankDetails || {};
   return {
     bankDetails: {
@@ -84,12 +90,19 @@ export async function updateBankDetails(partnerId, payload) {
  * Clear partner bank details (DELETE /api/partner/bank-details).
  */
 export async function clearBankDetails(partnerId) {
-  const user = await userRepository.clearBankDetails(partnerId);
+  const user = await User.findById(partnerId);
   if (!user) {
     const err = new Error("User not found");
     err.statusCode = 404;
     throw err;
   }
+  user.bankDetails = {
+    bankName: "",
+    branchName: "",
+    accountNo: "",
+    accountHolderName: "",
+  };
+  await user.save();
   return {
     bankDetails: {
       bankName: "",
