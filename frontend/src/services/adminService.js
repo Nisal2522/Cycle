@@ -117,7 +117,7 @@ export async function processPayout(token, payoutId) {
   return data;
 }
 
-/** Stripe live transactions (Payments collection) for admin table */
+/** Live transactions (Payments collection) for admin table */
 export async function getAdminPayments(token) {
   const { data } = await axiosClient.get(`${API}/payments`, authHeader(token));
   return data;
@@ -126,6 +126,15 @@ export async function getAdminPayments(token) {
 /** Partner payout requests (manual payouts from available balance) */
 export async function getPayoutRequests(token) {
   const { data } = await axiosClient.get(`${API}/payout-requests`, authHeader(token));
+  return data;
+}
+
+/** PayHere init params for admin "Approve & Pay" — submit form to PayHere sandbox */
+export async function getPayhereInit(token, requestId) {
+  const { data } = await axiosClient.get(
+    `${API}/payout-requests/${requestId}/payhere-init`,
+    authHeader(token)
+  );
   return data;
 }
 

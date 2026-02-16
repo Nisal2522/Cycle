@@ -18,7 +18,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
-import { stripeWebhook, payhereNotify } from "./controllers/paymentController.js";
+import { payhereNotify } from "./controllers/paymentController.js";
 import { protect } from "./middleware/authMiddleware.js";
 import { getRides } from "./controllers/cyclistController.js";
 import { getCheckouts } from "./controllers/partnerController.js";
@@ -40,7 +40,6 @@ app.use(
     credentials: true,
   })
 );
-app.use("/api/payments/webhook", express.raw({ type: "application/json" }), asyncHandler(stripeWebhook));
 app.use("/api/payments/payhere/notify", express.urlencoded({ extended: true }), asyncHandler(payhereNotify));
 app.use(express.json({ limit: "10mb" }));
 

@@ -6,6 +6,7 @@
 
 import * as adminService from "../services/adminService.js";
 import * as payoutService from "../services/payoutService.js";
+import { buildPayoutPaymentParams } from "../utils/payhereHelper.js";
 import { success } from "../utils/responseFormatter.js";
 
 export async function getStats(req, res) {
@@ -145,6 +146,31 @@ export async function getPayoutsExport(req, res) {
 export async function getPayoutRequests(req, res) {
   const requests = await payoutService.getPayoutRequests();
   res.json(requests);
+}
+
+/**
+ * GET /api/admin/payout-requests/:id/payhere-init — PayHere checkout params for "Approve & Pay".
+ * Admin uses these to submit form to PayHere sandbox; on success PayHere notifies us and we mark payout Paid.
+ */
+export async function getPayhereInit(req, res) {
+  const request = await payoutService.getPayoutRequestById(req.params.id);
+  if (!request) {
+    res.status(404);
+    throw new Error("Payout request not found");
+  }
+  if (request.status !== "Pending") {
+    res.status(400);
+    throw new Error(`Payout request is already ${request.status}`);
+  }
+  const partnerName = request.partnerId?.shopName || request.partnerId?.name || "Partner";
+  const partnerEmail = request.partnerId?.email || "";
+  const { payhereUrl, formData } = buildPayoutPaymentParams({
+    orderId: String(request._id),
+    amount: request.amount,
+    partnerName,
+    partnerEmail,
+  });
+  res.json({ payhereUrl, formData });
 }
 
 export async function approvePayoutRequest(req, res) {

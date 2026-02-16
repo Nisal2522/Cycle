@@ -47,9 +47,6 @@ import AdminRouteOverviewPage from "./pages/AdminRouteOverviewPage";
 import RedeemRewardsPage from "./pages/RedeemRewardsPage";
 import SavedRoutesPage from "./pages/SavedRoutesPage";
 import PaymentPage from "./pages/PaymentPage";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentCancel from "./pages/PaymentCancel";
-import { StripePaymentProvider } from "./features/payments";
 import ChatPage from "./pages/ChatPage";
 
 // Features (RBAC — Requirement iv)
@@ -182,9 +179,7 @@ export default function App() {
           <Route path="weather" element={<WeatherPage />} />
           <Route path="redeem" element={<RedeemRewardsPage />} />
           <Route path="routes" element={<SavedRoutesPage />} />
-          <Route path="payment" element={<StripePaymentProvider><PaymentPage /></StripePaymentProvider>} />
-          <Route path="payment/success" element={<StripePaymentProvider><PaymentSuccess /></StripePaymentProvider>} />
-          <Route path="payment/cancel" element={<StripePaymentProvider><PaymentCancel /></StripePaymentProvider>} />
+          <Route path="payment" element={<PaymentPage />} />
           <Route path="messages" element={<ChatPage />} />
         </Route>
 

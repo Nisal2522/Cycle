@@ -59,7 +59,7 @@ import {
   calculatePayouts,
   processPayout,
   getPayoutRequests,
-  approvePayoutRequest,
+  getPayhereInit,
   rejectPayoutRequest,
 } from "../services/adminService";
 import BankInfoModal from "../components/admin/BankInfoModal";
@@ -261,6 +261,82 @@ export default function AdminDashboard() {
         .finally(() => setLoadingPayoutRequests(false));
     }
   }, [activeTab, token]);
+
+  // When returning from PayHere in same tab: refetch and show toast
+  useEffect(() => {
+    if (activeTab !== "payouts" || !token || typeof window !== "undefined" && window.opener) return;
+    const payhere = searchParams.get("payhere");
+    if (payhere !== "success") return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("payhere");
+      return next;
+    }, { replace: true });
+    getPayoutRequests(token)
+      .then(setPayoutRequests)
+      .catch(() => {});
+    toast.success("Payment completed. Payout request updated.", { iconTheme: { primary: MAROON } });
+  }, [activeTab, token, searchParams]);
+
+  // When this page is the PayHere return/cancel popup: notify opener and close
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.opener) return;
+    const payhere = searchParams.get("payhere");
+    if (!payhere) return;
+    try {
+      window.opener.postMessage({ type: "payhere-return", payhere }, window.location.origin);
+    } catch (_) {}
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("payhere");
+      return next;
+    }, { replace: true });
+    const id = setTimeout(() => window.close(), 1200);
+    return () => clearTimeout(id);
+  }, [searchParams]);
+
+  // Opener: listen for popup PayHere return and refetch
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.origin !== window.location.origin || event.data?.type !== "payhere-return") return;
+      if (event.data.payhere === "success" && token) {
+        getPayoutRequests(token).then(setPayoutRequests).catch(() => {});
+        toast.success("Payment completed. Payout request updated.", { iconTheme: { primary: MAROON } });
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [token]);
+
+  /** Open PayHere checkout in a popup (same dashboard context); on return, popup notifies and closes. */
+  const handleApproveAndPayPayHere = async (requestId) => {
+    if (!token) return;
+    setProcessingRequestId(requestId);
+    try {
+      const { payhereUrl, formData } = await getPayhereInit(token, requestId);
+      const width = 480;
+      const height = 680;
+      const left = Math.round((window.screen.width - width) / 2);
+      const top = Math.round((window.screen.height - height) / 2);
+      const popup = window.open("", "payhere-checkout", `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`);
+      if (!popup) {
+        toast.error("Popup blocked. Please allow popups for this site and try again.");
+        return;
+      }
+      const inputs = Object.entries(formData || {})
+        .map(([k, v]) => `<input type="hidden" name="${k.replace(/"/g, "&quot;")}" value="${String(v ?? "").replace(/"/g, "&quot;")}" />`)
+        .join("");
+      popup.document.write(
+        `<!DOCTYPE html><html><head><title>PayHere</title></head><body><form id="f" method="POST" action="${payhereUrl.replace(/"/g, "&quot;")}">${inputs}</form><script>document.getElementById("f").submit();<\/script></body></html>`
+      );
+      popup.document.close();
+      toast.success("Complete payment in the popup. This request will update when payment is confirmed.", { duration: 5000, iconTheme: { primary: MAROON } });
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to open PayHere");
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
 
   const handleVerify = async (u) => {
     setActioning(u._id);
@@ -1083,15 +1159,15 @@ export default function AdminDashboard() {
         {/* Payout Management — mobile responsive */}
         {activeTab === "payouts" && (
           <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="space-y-4 px-0 sm:px-0">
-            {/* Live Transactions (Stripe Payments) */}
+            {/* Live Transactions (Payments) */}
             <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-100 overflow-hidden">
               <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2">
-                <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate">Live Transactions (Stripe)</h2>
+                <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate">Live Transactions (Payments)</h2>
                 {loadingPayments && <Loader2 className="w-5 h-5 shrink-0 animate-spin" style={{ color: MAROON }} />}
               </div>
               {/* Mobile: cards */}
               <div className="md:hidden divide-y divide-slate-100">
-                {payments.length === 0 && !loadingPayments && <p className="p-4 text-center text-slate-500 text-sm">No Stripe transactions yet.</p>}
+                {payments.length === 0 && !loadingPayments && <p className="p-4 text-center text-slate-500 text-sm">No payment transactions yet.</p>}
                 {payments.map((p) => (
                   <div key={p._id} className="p-3 sm:p-4 flex flex-col gap-1.5">
                     <div className="flex justify-between items-start gap-2">
@@ -1142,7 +1218,7 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-              {payments.length === 0 && !loadingPayments && <p className="hidden md:block p-6 text-center text-slate-500">No Stripe transactions yet.</p>}
+              {payments.length === 0 && !loadingPayments && <p className="hidden md:block p-6 text-center text-slate-500">No payment transactions yet.</p>}
             </div>
             <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-slate-100 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
               <span className="text-sm font-medium text-slate-700">Calculate payouts for month:</span>
@@ -1200,19 +1276,7 @@ export default function AdminDashboard() {
                         <>
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!token) return;
-                              setProcessingRequestId(r._id);
-                              try {
-                                await approvePayoutRequest(token, r._id);
-                                setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
-                                toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
-                              } catch (err) {
-                                toast.error(err.response?.data?.message || "Failed to approve payout");
-                              } finally {
-                                setProcessingRequestId(null);
-                              }
-                            }}
+                            onClick={() => handleApproveAndPayPayHere(r._id)}
                             disabled={processingRequestId === r._id}
                             className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
                             style={{ backgroundColor: MAROON }}
@@ -1275,19 +1339,7 @@ export default function AdminDashboard() {
                               <>
                                 <button
                                   type="button"
-                                  onClick={async () => {
-                                    if (!token) return;
-                                    setProcessingRequestId(r._id);
-                                    try {
-                                      await approvePayoutRequest(token, r._id);
-                                      setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
-                                      toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
-                                    } catch (err) {
-                                      toast.error(err.response?.data?.message || "Failed to approve payout");
-                                    } finally {
-                                      setProcessingRequestId(null);
-                                    }
-                                  }}
+                                  onClick={() => handleApproveAndPayPayHere(r._id)}
                                   disabled={processingRequestId === r._id}
                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
                                   style={{ backgroundColor: MAROON }}

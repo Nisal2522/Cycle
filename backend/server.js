@@ -2,13 +2,16 @@
  * server.js — Entry point: loads env, connects DB, starts HTTP server + Socket.io.
  */
 import http from "http";
+import path from "path";
+import { fileURLToPath } from "url";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
 import connectDB from "./src/config/db.js";
 import app from "./src/app.js";
 import { setupChatSocket } from "./src/socket/chatSocket.js";
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, ".env") });
 connectDB();
 
 const allowedOrigins = [

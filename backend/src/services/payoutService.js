@@ -139,6 +139,16 @@ export async function getPayoutRequests() {
 }
 
 /**
+ * Get a single payout request by id (for PayHere init).
+ */
+export async function getPayoutRequestById(requestId) {
+  const request = await PayoutRequest.findById(requestId)
+    .populate("partnerId", "name email shopName")
+    .lean();
+  return request;
+}
+
+/**
  * Approve a payout request: mark Paid and deduct amount from partner's available balance.
  */
 export async function approvePayoutRequest(requestId) {

@@ -37,6 +37,7 @@ import {
   deleteAdminHazard,
   getPayments,
   getPayoutRequests,
+  getPayhereInit,
   approvePayoutRequest,
   rejectPayoutRequest,
 } from "../controllers/adminController.js";
@@ -73,6 +74,7 @@ router.patch(
 );
 router.post("/payouts/:id/process", asyncHandler(processPayout));
 router.get("/payout-requests", asyncHandler(getPayoutRequests));
+router.get("/payout-requests/:id/payhere-init", asyncHandler(getPayhereInit));
 router.post("/payout-requests/:id/approve", asyncHandler(approvePayoutRequest));
 router.post(
   "/payout-requests/:id/reject",
