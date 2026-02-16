@@ -7,11 +7,10 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Calendar, CheckCircle, Clock, Loader2, Receipt, Wallet } from "lucide-react";
+import { DollarSign, Loader2, Wallet } from "lucide-react";
 import useAuth from "../../hooks/useAuth";
 import { getPartnerEarnings, createPayoutRequest } from "../../services/partnerService";
-
-const MAROON = "#80134D";
+import PaymentHistoryTable from "../../components/PaymentHistoryTable";
 
 export default function EarningsPage() {
   const { token } = useAuth();
@@ -24,9 +23,10 @@ export default function EarningsPage() {
 
   useEffect(() => {
     if (!token) return;
+    setLoading(true);
     getPartnerEarnings(token)
       .then((data) => {
-        setAvailableBalance(data?.availableBalance || 0);
+        setAvailableBalance(data?.availableBalance ?? 0);
         setPayouts(Array.isArray(data?.payouts) ? data.payouts : []);
       })
       .catch(() => {
@@ -35,13 +35,6 @@ export default function EarningsPage() {
       })
       .finally(() => setLoading(false));
   }, [token]);
-
-  const formatMonth = (m) => {
-    if (!m || m.length < 7) return m;
-    const [y, mo] = m.split("-");
-    const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    return `${names[parseInt(mo, 10) - 1]} ${y}`;
-  };
 
   return (
     <div className="min-h-[100dvh] md:min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50/50">
@@ -149,70 +142,14 @@ export default function EarningsPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="w-full bg-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.08),0_10px_25px_rgba(0,0,0,0.05)] border-t border-white/30 overflow-hidden"
         >
-          <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center gap-3">
-            <Receipt className="w-5 h-5" style={{ color: MAROON }} />
-            <h2 className="text-lg font-semibold text-slate-800">Payment History</h2>
-          </div>
-
-          {loading ? (
-            <div className="flex flex-col items-center justify-center min-h-[280px] py-20">
-              <Loader2 className="w-8 h-8 animate-spin mb-4" style={{ color: MAROON }} />
-              <p className="text-sm text-slate-500">Loading payments...</p>
-            </div>
-          ) : payouts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[280px] py-20 text-center px-6 w-full">
-              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-5">
-                <Calendar className="w-8 h-8 text-slate-400" />
-              </div>
-              <p className="text-lg font-semibold text-slate-700">No payments yet</p>
-              <p className="text-sm text-slate-500 mt-3 max-w-sm">
-                Your monthly payouts will appear here once processed by the admin.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto w-full">
-              <table className="w-full text-sm min-w-[480px]">
-                <thead>
-                  <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
-                    <th className="px-4 py-3">Month</th>
-                    <th className="px-4 py-3">Tokens Redeemed</th>
-                    <th className="px-4 py-3">Amount (LKR)</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Transaction</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payouts.map((p) => (
-                    <tr key={p._id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                      <td className="px-4 py-3 font-medium text-slate-800">{formatMonth(p.month)}</td>
-                      <td className="px-4 py-3 text-slate-600">{p.totalTokens}</td>
-                      <td className="px-4 py-3 font-semibold" style={{ color: MAROON }}>
-                        {p.totalAmount?.toLocaleString()} LKR
-                      </td>
-                      <td className="px-4 py-3">
-                        {p.status === "Paid" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Paid
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                            <Clock className="w-3.5 h-3.5" />
-                            Pending
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-400 font-mono truncate max-w-[140px]" title={p.transactionId}>
-                        {p.status === "Paid" && p.transactionId ? p.transactionId : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <PaymentHistoryTable
+            payouts={payouts}
+            loading={loading}
+            emptyTitle="No payments yet"
+            emptyDesc="Your monthly payouts will appear here once processed by the admin."
+            accentColor="#80134D"
+          />
         </motion.div>
       </div>
     </div>

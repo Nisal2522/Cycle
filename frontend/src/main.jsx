@@ -25,7 +25,9 @@ import { ThemeProvider } from "./context/ThemeContext.jsx";
 
 import "./index.css";
 
-// Use full Google OAuth Client ID in .env as VITE_GOOGLE_CLIENT_ID (e.g. xxx.apps.googleusercontent.com)
+// Google OAuth: set VITE_GOOGLE_CLIENT_ID in .env. If you see 403 "origin is not allowed for the given client ID",
+// add your app origin in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID →
+// Authorized JavaScript origins: http://localhost:5173, http://localhost:3000, and your production URL.
 const googleClientId =
   import.meta.env.VITE_GOOGLE_CLIENT_ID || "project-2cc0997c-aa2b-433a-8c9";
 

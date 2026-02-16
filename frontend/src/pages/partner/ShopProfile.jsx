@@ -348,7 +348,7 @@ export default function ShopProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-0 bg-slate-100/80">
+      <div className="min-h-[100dvh] md:min-h-screen bg-slate-100/80 dark:bg-slate-900/50">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-10 pb-6 sm:pb-8">
           <div className="h-8 w-36 bg-slate-200/80 rounded-lg mb-6 animate-pulse" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -369,5 +369,5 @@ export default function ShopProfile() {
     );
   }
 
-  return <div className="min-h-0 bg-slate-100/80">{content}</div>;
+  return <div className="min-h-[100dvh] md:min-h-screen bg-slate-100/80 dark:bg-slate-900/50">{content}</div>;
 }

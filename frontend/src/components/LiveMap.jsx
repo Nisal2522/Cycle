@@ -199,6 +199,22 @@ function weatherFromCode(code) {
    Location search input (Nominatim autocomplete)
    ────────────────────────────────────────────── */
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+const NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+
+/** Reverse geocode (lat, lng) to a display name. Returns short label or null. */
+async function reverseGeocode(lat, lng) {
+  try {
+    const { data } = await axios.get(NOMINATIM_REVERSE_URL, {
+      params: { lat, lon: lng, format: "json" },
+      headers: { "User-Agent": "CycleLink-App" },
+      timeout: 5000,
+    });
+    const name = data?.address?.road || data?.address?.suburb || data?.address?.neighbourhood || data?.address?.village || data?.address?.town || data?.address?.city || data?.name || data?.display_name?.split(",")[0];
+    return name?.trim() || null;
+  } catch {
+    return null;
+  }
+}
 
 function LocationSearchInput({
   placeholder,
@@ -742,12 +758,26 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
     const dist = sessionDistRef.current;
     if (dist < 0.01 || !token) return;
     try {
-      const startLocation = startPlace?.label ?? undefined;
-      const endLocation = endPlace?.label ?? undefined;
+      let startLocation = startPlace?.label ?? undefined;
+      let endLocation = endPlace?.label ?? undefined;
+      if (startLocation == null || endLocation == null) {
+        if (routeCoords.length >= 2) {
+          const [startName, endName] = await Promise.all([
+            reverseGeocode(routeCoords[0].lat, routeCoords[0].lng),
+            reverseGeocode(routeCoords[routeCoords.length - 1].lat, routeCoords[routeCoords.length - 1].lng),
+          ]);
+          if (startLocation == null) startLocation = startName || "Start";
+          if (endLocation == null) endLocation = endName || "End";
+        } else if (userPos && userPos.length >= 2) {
+          const endName = await reverseGeocode(userPos[0], userPos[1]);
+          if (endLocation == null) endLocation = endName || "Current location";
+          if (startLocation == null) startLocation = "Start";
+        }
+      }
       const duration = routeDurationText || undefined;
       const data = await updateDistance(token, parseFloat(dist.toFixed(2)), {
-        startLocation,
-        endLocation,
+        startLocation: startLocation || undefined,
+        endLocation: endLocation || undefined,
         duration,
       });
       sessionDistRef.current = 0;

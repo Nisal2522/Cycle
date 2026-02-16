@@ -26,37 +26,43 @@
 
 import { createContext, useState, useEffect, useCallback } from "react";
 import { registerUser, loginUser, googleLogin as googleLoginApi, updateProfile as updateProfileApi, uploadAvatar as uploadAvatarApi } from "../services/authService";
-
-// Keys used for localStorage persistence
-const STORAGE_KEYS = {
-  TOKEN: "cyclelink_token",
-  USER: "cyclelink_user",
-};
+import { TOKEN_KEY, USER_KEY, AUTH_LOGOUT_EVENT } from "../constants/auth";
 
 // Create context
 export const AuthContext = createContext(null);
 
+/** Hydrate auth state from localStorage synchronously so user stays logged in on refresh */
+function getInitialToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function getInitialUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(getInitialUser);
+  const [token, setToken] = useState(getInitialToken);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ── Restore session from localStorage on mount ──
+  // Sync state when 401 handler clears auth (interceptor / errorHandler)
   useEffect(() => {
-    try {
-      const storedToken = localStorage.getItem(STORAGE_KEYS.TOKEN);
-      const storedUser = localStorage.getItem(STORAGE_KEYS.USER);
-
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      }
-    } catch {
-      // Corrupted storage — clear it
-      localStorage.removeItem(STORAGE_KEYS.TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.USER);
-    }
+    const handleUnauthorized = () => {
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, handleUnauthorized);
   }, []);
 
   /**
@@ -64,22 +70,25 @@ export default function AuthProvider({ children }) {
    * Includes role + partner metadata when present.
    */
   const saveSession = useCallback((data) => {
+    const tokenValue = data?.token;
+    if (!tokenValue || typeof tokenValue !== "string") return;
+
+    const role = (data.role && String(data.role).toLowerCase()) || "cyclist";
     const userData = {
       _id: data._id,
       name: data.name,
       email: data.email,
-      role: data.role || "cyclist",
-      shopName: data.shopName || null,
+      role: ["cyclist", "partner", "admin"].includes(role) ? role : "cyclist",
+      shopName: data.shopName ?? null,
       shopImage: data.shopImage ?? data.shopImageUrl ?? "",
       profileImage: data.profileImage ?? "",
       partnerTotalRedemptions: data.partnerTotalRedemptions || 0,
     };
 
-    setToken(data.token);
+    setToken(tokenValue);
     setUser(userData);
-
-    localStorage.setItem(STORAGE_KEYS.TOKEN, data.token);
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+    localStorage.setItem(TOKEN_KEY, tokenValue);
+    localStorage.setItem(USER_KEY, JSON.stringify(userData));
   }, []);
 
   /**
@@ -162,8 +171,8 @@ export default function AuthProvider({ children }) {
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   }, []);
 
   /**
@@ -178,7 +187,7 @@ export default function AuthProvider({ children }) {
     setUser((prev) => {
       if (!prev) return prev;
       const next = { ...prev, ...partial };
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(next));
+      localStorage.setItem(USER_KEY, JSON.stringify(next));
       return next;
     });
   }, []);

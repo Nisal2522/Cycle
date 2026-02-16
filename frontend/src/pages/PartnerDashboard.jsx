@@ -91,7 +91,8 @@ export default function PartnerDashboard() {
   );
 
   const totalRedemptions = user?.partnerTotalRedemptions || 0;
-  const activeRewards = rewards.filter((r) => r.active).length;
+  const rewardsList = Array.isArray(rewards) ? rewards : [];
+  const activeRewards = rewardsList.filter((r) => r.active).length;
 
   const STATS = useMemo(
     () => [
@@ -130,7 +131,10 @@ export default function PartnerDashboard() {
     setLoadingRewards(true);
     getPartnerRewards(token, user._id)
       .then((data) => {
-        if (!cancelled) setRewards(data || []);
+        if (!cancelled) {
+          const list = Array.isArray(data) ? data : (data?.data ?? []);
+          setRewards(list);
+        }
       })
       .catch(() => {
         if (!cancelled) setRewards([]);
@@ -211,11 +215,11 @@ export default function PartnerDashboard() {
       if (editingReward) {
         const updated = await updateReward(token, editingReward._id, payload);
         setRewards((prev) =>
-          prev.map((r) => (r._id === updated._id ? updated : r))
+          (Array.isArray(prev) ? prev : []).map((r) => (r._id === updated._id ? updated : r))
         );
       } else {
         const created = await createReward(token, payload);
-        setRewards((prev) => [created, ...prev]);
+        setRewards((prev) => [created, ...(Array.isArray(prev) ? prev : [])]);
       }
       resetForm();
     } catch (err) {
@@ -229,7 +233,7 @@ export default function PartnerDashboard() {
     if (!token) return;
     try {
       await deleteReward(token, rewardId);
-      setRewards((prev) => prev.filter((r) => r._id !== rewardId));
+      setRewards((prev) => (Array.isArray(prev) ? prev : []).filter((r) => r._id !== rewardId));
     } catch {
       // ignore for now; you could surface a toast here
     }
@@ -422,9 +426,9 @@ export default function PartnerDashboard() {
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
                   Active Rewards
                 </h3>
-                {!loadingRewards && rewards.length > 0 && (
+                {!loadingRewards && rewardsList.length > 0 && (
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full">
-                    {rewards.length} {rewards.length === 1 ? "reward" : "rewards"}
+                    {rewardsList.length} {rewardsList.length === 1 ? "reward" : "rewards"}
                   </span>
                 )}
               </div>
@@ -433,7 +437,7 @@ export default function PartnerDashboard() {
                   <Loader2 className="w-8 h-8 text-primary animate-spin" />
                   <p className="text-sm font-medium text-slate-500">Loading rewards…</p>
                 </div>
-              ) : rewards.length === 0 ? (
+              ) : rewardsList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-6 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/30">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center mb-4">
                     <Gift className="w-8 h-8 text-purple-500 dark:text-purple-400" />
@@ -453,7 +457,7 @@ export default function PartnerDashboard() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {rewards.map((r) => (
+                  {rewardsList.map((r) => (
                     <div
                       key={r._id}
                       className="relative overflow-hidden bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-[0_4px_14px_rgba(0,0,0,0.06)] dark:shadow-none border dark:border-slate-700"

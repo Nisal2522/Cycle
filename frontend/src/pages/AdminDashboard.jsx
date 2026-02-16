@@ -60,7 +60,10 @@ import {
   processPayout,
   getPayoutRequests,
   approvePayoutRequest,
+  rejectPayoutRequest,
 } from "../services/adminService";
+import BankInfoModal from "../components/admin/BankInfoModal";
+import RejectPayoutRequestModal from "../components/admin/RejectPayoutRequestModal";
 
 ChartJS.register(
   CategoryScale,
@@ -74,6 +77,21 @@ ChartJS.register(
 );
 
 const MAROON = "#80134D";
+
+/** Inline bank details for Pending payouts/requests so Admin can verify before Approve (Requirement vi). */
+function PendingBankDetails({ partner, className = "" }) {
+  const bd = partner?.bankDetails || {};
+  const hasAny = [bd.bankName, bd.branchName, bd.accountNo, bd.accountHolderName].some((v) => v && String(v).trim());
+  if (!hasAny) return <p className={`text-xs text-amber-600 ${className}`}>Bank details not provided</p>;
+  return (
+    <div className={`text-xs text-slate-600 mt-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100 ${className}`}>
+      <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">Verify before approve</p>
+      <p className="font-medium text-slate-700">{bd.bankName || "—"}{bd.branchName ? ` · ${bd.branchName}` : ""}</p>
+      <p className="text-slate-600">Account: <span className="font-mono">{bd.accountNo || "—"}</span> · {bd.accountHolderName || "—"}</p>
+    </div>
+  );
+}
+
 const fadeIn = {
   hidden: { opacity: 0, y: 16 },
   visible: (i) => ({
@@ -144,6 +162,9 @@ export default function AdminDashboard() {
   const [calculating, setCalculating] = useState(false);
   const [processingPayoutId, setProcessingPayoutId] = useState(null);
   const [processingRequestId, setProcessingRequestId] = useState(null);
+  const [bankModalPartner, setBankModalPartner] = useState(null);
+  const [rejectModalRequest, setRejectModalRequest] = useState(null);
+  const [rejectingRequestId, setRejectingRequestId] = useState(null);
   const [adminApi404, setAdminApi404] = useState(false);
   const [userRoleFilter, setUserRoleFilter] = useState("all"); // "all" | "cyclist" | "partner" | "admin"
   const [growthPeriod, setGrowthPeriod] = useState("thisYear"); // "thisYear" | "thisMonth"
@@ -1160,34 +1181,56 @@ export default function AdminDashboard() {
                         <p className="font-medium text-slate-800 text-sm">{r.partnerId?.shopName || r.partnerId?.name || "—"}</p>
                         <p className="text-xs text-slate-400">{r.partnerId?.email}</p>
                       </div>
-                      <span className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
+                      <span className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : r.status === "Rejected" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-800">{r.amount?.toLocaleString()} LKR</p>
+                    <p className="text-xs text-slate-600">Available: <span className="font-medium text-slate-800">{(r.partnerId?.partnerAvailableBalance ?? 0).toLocaleString()} LKR</span></p>
+                    {r.rejectionReason && <p className="text-xs text-red-600">Rejection: {r.rejectionReason}</p>}
                     <p className="text-xs text-slate-500">{r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}</p>
-                    {r.status === "Pending" && (
+                    {r.status === "Pending" && <PendingBankDetails partner={r.partnerId} />}
+                    <div className="flex flex-wrap gap-2 mt-1">
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!token) return;
-                          setProcessingRequestId(r._id);
-                          try {
-                            await approvePayoutRequest(token, r._id);
-                            setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
-                            toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
-                          } catch (err) {
-                            toast.error(err.response?.data?.message || "Failed to approve payout");
-                          } finally {
-                            setProcessingRequestId(null);
-                          }
-                        }}
-                        disabled={processingRequestId === r._id}
-                        className="w-full mt-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
-                        style={{ backgroundColor: MAROON }}
+                        onClick={() => setBankModalPartner(r.partnerId || null)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
                       >
-                        {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                        Approve &amp; Pay
+                        View Bank Info
                       </button>
-                    )}
+                      {r.status === "Pending" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!token) return;
+                              setProcessingRequestId(r._id);
+                              try {
+                                await approvePayoutRequest(token, r._id);
+                                setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
+                                toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
+                              } catch (err) {
+                                toast.error(err.response?.data?.message || "Failed to approve payout");
+                              } finally {
+                                setProcessingRequestId(null);
+                              }
+                            }}
+                            disabled={processingRequestId === r._id}
+                            className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+                            style={{ backgroundColor: MAROON }}
+                          >
+                            {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                            Approve &amp; Pay
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRejectModalRequest({ id: r._id, partnerName: r.partnerId?.shopName || r.partnerId?.name, amount: r.amount })}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Reject
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1198,6 +1241,7 @@ export default function AdminDashboard() {
                     <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
                       <th className="px-4 py-3">Partner</th>
                       <th className="px-4 py-3">Amount (LKR)</th>
+                      <th className="px-4 py-3">Available (LKR)</th>
                       <th className="px-4 py-3">Requested At</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3 text-right">Action</th>
@@ -1209,37 +1253,59 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800">{r.partnerId?.shopName || r.partnerId?.name || "—"}</p>
                           <p className="text-xs text-slate-400">{r.partnerId?.email}</p>
+                          {r.status === "Pending" && <PendingBankDetails partner={r.partnerId} className="mt-1" />}
                         </td>
                         <td className="px-4 py-3 font-semibold">{r.amount?.toLocaleString()} LKR</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{(r.partnerId?.partnerAvailableBalance ?? 0).toLocaleString()}</td>
                         <td className="px-4 py-3 text-xs text-slate-500">{r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : r.status === "Rejected" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
+                          {r.rejectionReason && <p className="text-xs text-red-600 mt-0.5 max-w-[180px] truncate" title={r.rejectionReason}>{r.rejectionReason}</p>}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {r.status === "Pending" && (
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             <button
                               type="button"
-                              onClick={async () => {
-                                if (!token) return;
-                                setProcessingRequestId(r._id);
-                                try {
-                                  await approvePayoutRequest(token, r._id);
-                                  setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
-                                  toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
-                                } catch (err) {
-                                  toast.error(err.response?.data?.message || "Failed to approve payout");
-                                } finally {
-                                  setProcessingRequestId(null);
-                                }
-                              }}
-                              disabled={processingRequestId === r._id}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
-                              style={{ backgroundColor: MAROON }}
+                              onClick={() => setBankModalPartner(r.partnerId || null)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
                             >
-                              {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                              Approve &amp; Pay
+                              View Bank Info
                             </button>
-                          )}
+                            {r.status === "Pending" && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!token) return;
+                                    setProcessingRequestId(r._id);
+                                    try {
+                                      await approvePayoutRequest(token, r._id);
+                                      setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
+                                      toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
+                                    } catch (err) {
+                                      toast.error(err.response?.data?.message || "Failed to approve payout");
+                                    } finally {
+                                      setProcessingRequestId(null);
+                                    }
+                                  }}
+                                  disabled={processingRequestId === r._id}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+                                  style={{ backgroundColor: MAROON }}
+                                >
+                                  {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                                  Approve &amp; Pay
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setRejectModalRequest({ id: r._id, partnerName: r.partnerId?.shopName || r.partnerId?.name, amount: r.amount })}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1271,19 +1337,30 @@ export default function AdminDashboard() {
                       <span>{p.totalTokens} tokens</span>
                       <span className="font-semibold text-slate-800">{p.totalAmount?.toLocaleString()} LKR</span>
                     </div>
+                    <p className="text-xs text-slate-600">Available: <span className="font-medium text-slate-800">{(p.partnerId?.partnerAvailableBalance ?? 0).toLocaleString()} LKR</span></p>
                     {p.status === "Paid" && p.transactionId && <p className="text-xs text-slate-400 font-mono break-all">{p.transactionId}</p>}
-                    {p.status === "Pending" && (
+                    {p.status === "Pending" && <PendingBankDetails partner={p.partnerId} />}
+                    <div className="flex flex-wrap gap-2 mt-1">
                       <button
                         type="button"
-                        onClick={() => handleProcessPayout(p)}
-                        disabled={processingPayoutId === p._id}
-                        className="w-full mt-1 py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1"
-                        style={{ backgroundColor: MAROON }}
+                        onClick={() => setBankModalPartner(p.partnerId || null)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
                       >
-                        {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                        Process Payout
+                        View Bank Info
                       </button>
-                    )}
+                      {p.status === "Pending" && (
+                        <button
+                          type="button"
+                          onClick={() => handleProcessPayout(p)}
+                          disabled={processingPayoutId === p._id}
+                          className="py-2.5 px-3 rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1"
+                          style={{ backgroundColor: MAROON }}
+                        >
+                          {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                          Process Payout
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1296,6 +1373,7 @@ export default function AdminDashboard() {
                       <th className="px-4 py-3">Month</th>
                       <th className="px-4 py-3">Tokens Redeemed</th>
                       <th className="px-4 py-3">Amount (LKR)</th>
+                      <th className="px-4 py-3">Available (LKR)</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3 text-right">Action</th>
                     </tr>
@@ -1306,27 +1384,38 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800">{p.partnerId?.shopName || p.partnerId?.name || "—"}</p>
                           <p className="text-xs text-slate-400">{p.partnerId?.email}</p>
+                          {p.status === "Pending" && <PendingBankDetails partner={p.partnerId} className="mt-1" />}
                         </td>
                         <td className="px-4 py-3">{p.month}</td>
                         <td className="px-4 py-3">{p.totalTokens}</td>
                         <td className="px-4 py-3 font-medium">{p.totalAmount?.toLocaleString()} LKR</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{(p.partnerId?.partnerAvailableBalance ?? 0).toLocaleString()}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{p.status}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {p.status === "Pending" && (
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             <button
                               type="button"
-                              onClick={() => handleProcessPayout(p)}
-                              disabled={processingPayoutId === p._id}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-50"
-                              style={{ backgroundColor: MAROON }}
+                              onClick={() => setBankModalPartner(p.partnerId || null)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
                             >
-                              {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                              Process Payout
+                              View Bank Info
                             </button>
-                          )}
-                          {p.status === "Paid" && p.transactionId && <span className="text-xs text-slate-400">{p.transactionId}</span>}
+                            {p.status === "Pending" && (
+                              <button
+                                type="button"
+                                onClick={() => handleProcessPayout(p)}
+                                disabled={processingPayoutId === p._id}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-50"
+                                style={{ backgroundColor: MAROON }}
+                              >
+                                {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                                Process Payout
+                              </button>
+                            )}
+                            {p.status === "Paid" && p.transactionId && <span className="text-xs text-slate-400">{p.transactionId}</span>}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1347,6 +1436,45 @@ export default function AdminDashboard() {
           onApprove={handleApproveRoute}
           onReject={handleRejectRoute}
           actioning={actioningRouteId === previewRoute._id}
+        />
+      )}
+
+      {/* Bank details modal — partner account info for payouts */}
+      {bankModalPartner && (
+        <BankInfoModal
+          partner={bankModalPartner}
+          onClose={() => setBankModalPartner(null)}
+        />
+      )}
+
+      {/* Reject payout request modal — reason required */}
+      {rejectModalRequest && (
+        <RejectPayoutRequestModal
+          requestId={rejectModalRequest.id}
+          partnerName={rejectModalRequest.partnerName}
+          amount={rejectModalRequest.amount}
+          onClose={() => { setRejectModalRequest(null); setRejectingRequestId(null); }}
+          onConfirm={async (rejectionReason) => {
+            if (!token) return;
+            setRejectingRequestId(rejectModalRequest.id);
+            try {
+              await rejectPayoutRequest(token, rejectModalRequest.id, { rejectionReason });
+              setPayoutRequests((prev) =>
+                prev.map((x) =>
+                  x._id === rejectModalRequest.id
+                    ? { ...x, status: "Rejected", rejectionReason }
+                    : x
+                )
+              );
+              toast.success("Payout request rejected", { iconTheme: { primary: MAROON } });
+              setRejectModalRequest(null);
+            } catch (err) {
+              toast.error(err.response?.data?.message || "Failed to reject request");
+            } finally {
+              setRejectingRequestId(null);
+            }
+          }}
+          loading={rejectingRequestId === rejectModalRequest.id}
         />
       )}
     </div>

@@ -22,7 +22,8 @@
  */
 
 import { useEffect } from "react";
-import { Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { AUTH_LOGOUT_EVENT } from "./constants/auth";
 import { AnimatePresence } from "framer-motion";
 
 const THEME_STORAGE_KEY = "cycle-theme";
@@ -38,6 +39,7 @@ import TripHistoryPage from "./pages/TripHistoryPage";
 import WeatherPage from "./pages/WeatherPage";
 import PartnerDashboard from "./pages/PartnerDashboard";
 import ShopProfile from "./pages/partner/ShopProfile";
+import BankSettings from "./pages/partner/BankSettings";
 import EarningsPage from "./pages/partner/EarningsPage";
 import PartnerScanPage from "./pages/partner/PartnerScanPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -47,10 +49,11 @@ import SavedRoutesPage from "./pages/SavedRoutesPage";
 import PaymentPage from "./pages/PaymentPage";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
+import { StripePaymentProvider } from "./features/payments";
 import ChatPage from "./pages/ChatPage";
 
-// Components
-import ProtectedRoute from "./components/ProtectedRoute";
+// Features (RBAC — Requirement iv)
+import { ProtectedRoute, UnauthorizedPage } from "./features/auth";
 import PageTransition from "./components/PageTransition";
 import Sidebar from "./components/Sidebar";
 import MobileBottomNav from "./components/MobileBottomNav";
@@ -61,6 +64,7 @@ import SidebarProvider from "./context/SidebarContext";
 import ChatUnreadProvider from "./context/ChatUnreadContext";
 import useSidebar from "./hooks/useSidebar";
 import useAuth from "./hooks/useAuth";
+import { getDashboardPath } from "./config/roles";
 
 /**
  * DashboardContent
@@ -106,6 +110,7 @@ function DashboardLayout() {
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   // Apply saved theme to document on mount so dark mode affects all pages immediately
@@ -118,6 +123,16 @@ export default function App() {
       root.classList.remove("dark");
     }
   }, []);
+
+  // Global 401 handling: clear auth and redirect to login with "Session expired"
+  useEffect(() => {
+    const handleUnauthorized = (e) => {
+      const message = e?.detail?.message || "Session expired";
+      navigate("/login", { replace: true, state: { message } });
+    };
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, handleUnauthorized);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300">
@@ -141,8 +156,16 @@ export default function App() {
             </PageTransition>
           }
         />
+        <Route
+          path="/unauthorized"
+          element={
+            <PageTransition>
+              <UnauthorizedPage />
+            </PageTransition>
+          }
+        />
 
-        {/* ── Cyclist dashboard (nested routes) ── */}
+        {/* ── Cyclist dashboard (Profile, My Rides, etc.) — cyclist only ── */}
         <Route
           path="/dashboard"
           element={
@@ -159,13 +182,13 @@ export default function App() {
           <Route path="weather" element={<WeatherPage />} />
           <Route path="redeem" element={<RedeemRewardsPage />} />
           <Route path="routes" element={<SavedRoutesPage />} />
-          <Route path="payment" element={<PaymentPage />} />
-          <Route path="payment/success" element={<PaymentSuccess />} />
-          <Route path="payment/cancel" element={<PaymentCancel />} />
+          <Route path="payment" element={<StripePaymentProvider><PaymentPage /></StripePaymentProvider>} />
+          <Route path="payment/success" element={<StripePaymentProvider><PaymentSuccess /></StripePaymentProvider>} />
+          <Route path="payment/cancel" element={<StripePaymentProvider><PaymentCancel /></StripePaymentProvider>} />
           <Route path="messages" element={<ChatPage />} />
         </Route>
 
-        {/* ── Partner dashboard ── */}
+        {/* ── Partner dashboard (Scanner, Rewards Management) — partner only ── */}
         <Route
           path="/partner-dashboard"
           element={
@@ -183,6 +206,7 @@ export default function App() {
           <Route index element={<PartnerDashboard />} />
           <Route path="scan" element={<PartnerScanPage />} />
           <Route path="shop-profile" element={<ShopProfile />} />
+          <Route path="bank-settings" element={<BankSettings />} />
           <Route path="earnings" element={<EarningsPage />} />
           <Route path="messages" element={<ChatPage />} />
         </Route>
@@ -212,7 +236,7 @@ export default function App() {
           path="*"
           element={
             <Navigate
-              to={user ? "/dashboard" : "/"}
+              to={user ? getDashboardPath(user.role) : "/"}
               replace
             />
           }
