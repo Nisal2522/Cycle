@@ -1,0 +1,32 @@
+# tests/performance/artillery-script.yml - Load testing (Requirement vii)
+# Run: npx artillery run tests/performance/artillery-script.yml
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 30
+      arrivalRate: 5
+      name: "Sustained load"
+
+scenarios:
+  - name: "Health check"
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+  - name: "Public auth stats"
+    flow:
+      - get:
+          url: "/api/v1/auth/stats"
+          expect:
+            - statusCode: 200
+            - contentType: json
+  - name: "V1 auth login expect 401"
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "loadtest@example.com"
+            password: "wrong"
+          expect:
+            - statusCode: 401

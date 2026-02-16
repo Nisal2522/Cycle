@@ -12,21 +12,21 @@
  * --------------------------------------------------
  */
 
-import axios from "axios";
+import { axiosClient } from "./axiosClient.js";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const API_URL = BASE ? `${BASE}/hazards` : "/api/hazards";
 
 /** Helper — creates auth headers from JWT token */
 function authHeader(token) {
-  return { headers: { Authorization: `Bearer ${token}` } };
+  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 }
 
 /**
  * Fetch all active hazards (public endpoint — full payload).
  */
 export async function getHazards() {
-  const { data } = await axios.get(API_URL);
+  const { data } = await axiosClient.get(API_URL);
   return data;
 }
 
@@ -35,7 +35,7 @@ export async function getHazards() {
  * Used by the map to render pins with minimal payload.
  */
 export async function getHazardMarkers() {
-  const { data } = await axios.get(`${API_URL}/markers`);
+  const { data } = await axiosClient.get(`${API_URL}/markers`);
   return data;
 }
 
@@ -51,7 +51,7 @@ export async function reportHazard(token, hazardData) {
     type: hazardData.type ?? hazardData.category ?? "other",
     description: hazardData.description != null ? String(hazardData.description).trim() : "",
   };
-  const { data } = await axios.post(
+  const { data } = await axiosClient.post(
     `${API_URL}/report`,
     body,
     authHeader(token)
@@ -66,7 +66,7 @@ export async function reportHazard(token, hazardData) {
  * @param {{ type?: string, description?: string }} updates
  */
 export async function updateHazard(token, id, updates) {
-  const { data } = await axios.patch(
+  const { data } = await axiosClient.patch(
     `${API_URL}/${id}`,
     updates,
     authHeader(token)
@@ -80,7 +80,7 @@ export async function updateHazard(token, id, updates) {
  * @param {string} id — Hazard ObjectId
  */
 export async function deleteHazard(token, id) {
-  const { data } = await axios.delete(
+  const { data } = await axiosClient.delete(
     `${API_URL}/${id}`,
     authHeader(token)
   );

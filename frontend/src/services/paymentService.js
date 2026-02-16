@@ -2,23 +2,24 @@
  * services/paymentService.js
  * --------------------------------------------------
  * Stripe checkout: create session, confirm session (success callback).
+ * All API calls go through axiosClient (folder structure alignment).
  */
 
-import axios from "axios";
+import { axiosClient } from "./axiosClient.js";
 
-const BASE = import.meta.env.VITE_API_URL ?? "";
+const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 function authHeader(token) {
-  return { headers: { Authorization: `Bearer ${token}` } };
+  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 }
 
-const paymentsBase = BASE ? `${BASE}/payments` : "/api/payments";
+const paymentsBase = BASE ? `${BASE}/api/payments` : "/api/payments";
 
-/** Create checkout session; returns { url, sessionId }. Redirect user to url. */
-export async function createCheckoutSession(token) {
-  const { data } = await axios.post(
+/** Create checkout session; returns { url, sessionId }. Body optional: { lineItems: [{ name, description?, unit_amount, quantity? }] }. */
+export async function createCheckoutSession(token, body = {}) {
+  const { data } = await axiosClient.post(
     `${paymentsBase}/create-checkout-session`,
-    {},
+    body,
     authHeader(token)
   );
   return data;
@@ -26,7 +27,7 @@ export async function createCheckoutSession(token) {
 
 /** Confirm payment after success redirect (saves to DB if webhook didn't). */
 export async function confirmSession(token, sessionId) {
-  const { data } = await axios.post(
+  const { data } = await axiosClient.post(
     `${paymentsBase}/confirm-session`,
     { sessionId },
     authHeader(token)

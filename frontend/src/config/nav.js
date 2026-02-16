@@ -21,6 +21,8 @@ import {
   Trophy,
   CloudSun,
   Store,
+  Building2,
+  Landmark,
   QrCode,
   DollarSign,
   Megaphone,
@@ -40,6 +42,8 @@ const NAV_LINKS_BY_ROLE = {
   ],
   partner: [
     { label: "Dashboard", to: "/partner-dashboard" },
+    { label: "Shop Profile", to: "/partner-dashboard/shop-profile" },
+    { label: "Bank Settings", to: "/partner-dashboard/bank-settings" },
     { label: "Scan QR", to: "/partner-dashboard/scan" },
     { label: "Earnings", to: "/partner-dashboard/earnings" },
     { label: "Messages", to: "/partner-dashboard/messages" },
@@ -69,7 +73,9 @@ export const ROLE_NAV = {
     { to: "/dashboard/weather", label: "Weather", icon: CloudSun },
   ],
   partner: [
-    { to: "/partner-dashboard", label: "Shop", icon: Store },
+    { to: "/partner-dashboard", label: "Overview", icon: Store },
+    { to: "/partner-dashboard/shop-profile", label: "Shop Profile", icon: Building2 },
+    { to: "/partner-dashboard/bank-settings", label: "Bank Settings", icon: Landmark },
     { to: "/partner-dashboard/scan", label: "Scan QR", icon: QrCode },
     { to: "/partner-dashboard/earnings", label: "Earnings", icon: DollarSign },
     { to: "/partner-dashboard/messages", label: "Messages", icon: MessageCircle },

@@ -1,28 +1,24 @@
 /**
  * services/cyclistService.js
  * --------------------------------------------------
- * Axios-based API service for cyclist dashboard data.
- *
- *   getCyclistStats(token)            → GET  /api/cyclist/stats
- *   updateDistance(token, distance)    → POST /api/cyclist/update-distance
+ * Cyclist dashboard API. Uses axiosClient so Authorization is attached from localStorage when token is not passed.
  * --------------------------------------------------
  */
 
-import axios from "axios";
+import { axiosClient } from "./axiosClient.js";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const API_URL = BASE ? `${BASE}/cyclist` : "/api/cyclist";
 
-/** Helper — creates auth headers from JWT token */
 function authHeader(token) {
-  return { headers: { Authorization: `Bearer ${token}` } };
+  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 }
 
 /**
  * Fetch the logged-in cyclist's stats.
  */
 export async function getCyclistStats(token) {
-  const { data } = await axios.get(`${API_URL}/stats`, authHeader(token));
+  const { data } = await axiosClient.get(`${API_URL}/stats`, authHeader(token));
   return data;
 }
 
@@ -36,7 +32,7 @@ export async function updateDistance(token, distance, { startLocation, endLocati
   if (startLocation != null) body.startLocation = startLocation;
   if (endLocation != null) body.endLocation = endLocation;
   if (duration != null) body.duration = duration;
-  const { data } = await axios.post(
+  const { data } = await axiosClient.post(
     `${API_URL}/update-distance`,
     body,
     authHeader(token)
@@ -50,7 +46,7 @@ export async function updateDistance(token, distance, { startLocation, endLocati
  * @param {object} params - { period: 'week'|'month'|'3months'|'all', search?: string }
  */
 export async function getRides(token, params = {}) {
-  const { data } = await axios.get(`${API_URL}/rides`, {
+  const { data } = await axiosClient.get(`${API_URL}/rides`, {
     ...authHeader(token),
     params: { period: params.period || "week", search: params.search || undefined },
   });
@@ -61,7 +57,7 @@ export async function getRides(token, params = {}) {
  * Fetch the top 5 cyclists sorted by totalDistance.
  */
 export async function getLeaderboard(token) {
-  const { data } = await axios.get(
+  const { data } = await axiosClient.get(
     `${API_URL}/leaderboard`,
     authHeader(token)
   );
@@ -72,7 +68,7 @@ export async function getLeaderboard(token) {
  * Fetch the total number of partner shops (public).
  */
 export async function getPartnerCount() {
-  const { data } = await axios.get(`${API_URL}/partner-count`);
+  const { data } = await axiosClient.get(`${API_URL}/partner-count`);
   return data;   // { count: number }
 }
 
@@ -80,7 +76,7 @@ export async function getPartnerCount() {
  * Fetch all partner shops with reward preview (public).
  */
 export async function getPartnerShops() {
-  const { data } = await axios.get(`${API_URL}/partners`);
+  const { data } = await axiosClient.get(`${API_URL}/partners`);
   return data;
 }
 
@@ -88,6 +84,6 @@ export async function getPartnerShops() {
  * Fetch all active rewards for a specific partner shop (public).
  */
 export async function getShopRewards(partnerId) {
-  const { data } = await axios.get(`${API_URL}/partners/${partnerId}/rewards`);
+  const { data } = await axiosClient.get(`${API_URL}/partners/${partnerId}/rewards`);
   return data;   // { partner, rewards }
 }

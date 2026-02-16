@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Bike,
@@ -82,7 +82,8 @@ const QUICK_LINKS = [
 ];
 
 export default function CyclistDashboard() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const navigate = useNavigate();
 
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -96,13 +97,18 @@ export default function CyclistDashboard() {
       const data = await getCyclistStats(token);
       setStats(data);
     } catch (err) {
-      setStatsError(
-        err.response?.data?.message || "Failed to load stats. Is the backend running?"
-      );
+      const status = err.response?.status;
+      const message = err.response?.data?.message || "";
+      if (status === 401 && (message.includes("invalid token") || message.includes("expired") || message.includes("Not authorized"))) {
+        logout();
+        navigate("/login", { replace: true, state: { message: "Session expired or invalid. Please sign in again." } });
+        return;
+      }
+      setStatsError(message || "Failed to load stats. Is the backend running?");
     } finally {
       setStatsLoading(false);
     }
-  }, [token]);
+  }, [token, logout, navigate]);
 
   useEffect(() => {
     fetchStats();

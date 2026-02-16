@@ -4,13 +4,13 @@
  * AI chat: POST /api/ai/chat (non-streaming), POST /api/ai/chat/stream (SSE).
  */
 
-import axios from "axios";
+import { axiosClient } from "./axiosClient.js";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
 export async function sendAiChat(message, history = []) {
   const url = BASE ? `${BASE}/ai/chat` : "/api/ai/chat";
-  const { data } = await axios.post(url, { message, history }, {
+  const { data } = await axiosClient.post(url, { message, history }, {
     timeout: 30000,
     headers: { "Content-Type": "application/json" },
   });
