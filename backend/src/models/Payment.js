@@ -1,12 +1,13 @@
 /**
  * models/Payment.js
  * --------------------------------------------------
- * Stripe checkout payments (e.g. Premium Access).
- * Saved on successful checkout (webhook or success callback).
+ * Payment records for tracking completed transactions.
+ * Currently used for displaying payment history in admin dashboard.
+ * Can be extended for PayHere or other payment gateway integrations.
  *
  * Fields:
  *   - userId       : ObjectId → User
- *   - transactionId: Stripe session id or payment_intent id
+ *   - transactionId: Payment gateway transaction/order ID
  *   - amount       : number (LKR)
  *   - currency     : string (e.g. 'lkr')
  *   - status       : 'Success' | 'Pending'

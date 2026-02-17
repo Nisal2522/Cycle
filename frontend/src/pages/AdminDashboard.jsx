@@ -295,44 +295,52 @@ export default function AdminDashboard() {
     return () => clearTimeout(id);
   }, [searchParams]);
 
-  // Opener: listen for popup PayHere return and refetch
-  useEffect(() => {
-    const handler = (event) => {
-      if (event.origin !== window.location.origin || event.data?.type !== "payhere-return") return;
-      if (event.data.payhere === "success" && token) {
-        getPayoutRequests(token).then(setPayoutRequests).catch(() => {});
-        toast.success("Payment completed. Payout request updated.", { iconTheme: { primary: MAROON } });
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [token]);
+  // PayHere SDK callbacks handle payment status updates (see handleApproveAndPayPayHere)
 
-  /** Open PayHere checkout in a popup (same dashboard context); on return, popup notifies and closes. */
+  /** Open PayHere checkout using JavaScript SDK modal */
   const handleApproveAndPayPayHere = async (requestId) => {
     if (!token) return;
     setProcessingRequestId(requestId);
+
     try {
-      const { payhereUrl, formData } = await getPayhereInit(token, requestId);
-      const width = 480;
-      const height = 680;
-      const left = Math.round((window.screen.width - width) / 2);
-      const top = Math.round((window.screen.height - height) / 2);
-      const popup = window.open("", "payhere-checkout", `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`);
-      if (!popup) {
-        toast.error("Popup blocked. Please allow popups for this site and try again.");
-        return;
-      }
-      const inputs = Object.entries(formData || {})
-        .map(([k, v]) => `<input type="hidden" name="${k.replace(/"/g, "&quot;")}" value="${String(v ?? "").replace(/"/g, "&quot;")}" />`)
-        .join("");
-      popup.document.write(
-        `<!DOCTYPE html><html><head><title>PayHere</title></head><body><form id="f" method="POST" action="${payhereUrl.replace(/"/g, "&quot;")}">${inputs}</form><script>document.getElementById("f").submit();<\/script></body></html>`
-      );
-      popup.document.close();
-      toast.success("Complete payment in the popup. This request will update when payment is confirmed.", { duration: 5000, iconTheme: { primary: MAROON } });
+      // Get payment parameters from backend
+      const { formData } = await getPayhereInit(token, requestId);
+
+      // Configure PayHere callbacks
+      window.payhere.onCompleted = function onCompleted(orderId) {
+        console.log("Payment completed. OrderID:", orderId);
+        toast.success("Payment successful! Payout request will be updated shortly.", {
+          duration: 5000,
+          iconTheme: { primary: MAROON }
+        });
+        // Refresh payout requests to show updated status
+        setTimeout(() => {
+          if (token) {
+            getPayoutRequests(token).then(setPayoutRequests).catch(() => {});
+          }
+        }, 2000);
+      };
+
+      window.payhere.onDismissed = function onDismissed() {
+        console.log("Payment dismissed");
+        toast.info("Payment cancelled", {
+          iconTheme: { primary: MAROON }
+        });
+      };
+
+      window.payhere.onError = function onError(error) {
+        console.log("Payment error:", error);
+        toast.error(`Payment failed: ${error}`, {
+          duration: 6000
+        });
+      };
+
+      // Start PayHere modal
+      window.payhere.startPayment(formData);
+
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to open PayHere");
+      console.error("PayHere init error:", err);
+      toast.error(err.response?.data?.message || "Failed to initialize payment");
     } finally {
       setProcessingRequestId(null);
     }

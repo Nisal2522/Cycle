@@ -49,7 +49,7 @@ export function verifyNotifyPayload(body) {
  * Amount must be formatted with 2 decimals; hash must be uppercase.
  */
 export function buildPayoutPaymentParams(opts) {
-  const { orderId, amount, partnerName, partnerEmail = "" } = opts;
+  const { orderId, amount, partnerName, partnerEmail = "", partnerPhone = "", partnerAddress = "", partnerCity = "" } = opts;
   const secret = getEnv("PAYHERE_SECRET");
   const merchantId = getEnv("PAYHERE_MERCHANT_ID");
   if (!secret || !merchantId) {
@@ -72,6 +72,7 @@ export function buildPayoutPaymentParams(opts) {
   const notifyUrl = getNotifyUrl();
   const payhereUrl = getPayHereCheckoutUrl();
   const items = `Payout to ${String(partnerName).replace(/\|/g, " ")}|1|${amountStr}`;
+  const sandbox = getEnv("PAYHERE_SANDBOX", "true") === "true" ? 1 : 0;
 
   return {
     payhereUrl,
@@ -87,10 +88,11 @@ export function buildPayoutPaymentParams(opts) {
       first_name: "Admin",
       last_name: "Cycle",
       email: partnerEmail || "admin@cycle.lk",
-      phone: "",
-      address: "",
-      city: "",
+      phone: partnerPhone || "0771234567",
+      address: partnerAddress || "Colombo, Sri Lanka",
+      city: partnerCity || "Colombo",
       country: "Sri Lanka",
+      sandbox,
       hash,
     },
   };

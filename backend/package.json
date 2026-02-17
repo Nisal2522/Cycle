@@ -21,8 +21,7 @@
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
-    "socket.io": "^4.8.3",
-    "stripe": "^17.4.0"
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "jest": "^30.2.0",

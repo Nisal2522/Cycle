@@ -162,13 +162,20 @@ export async function getPayhereInit(req, res) {
     res.status(400);
     throw new Error(`Payout request is already ${request.status}`);
   }
-  const partnerName = request.partnerId?.shopName || request.partnerId?.name || "Partner";
-  const partnerEmail = request.partnerId?.email || "";
+  const partner = request.partnerId || {};
+  const partnerName = partner.shopName || partner.name || "Partner";
+  const partnerEmail = partner.email || "";
+  const partnerPhone = partner.phoneNumber || "";
+  const partnerAddress = partner.address || "";
+  const partnerCity = partner.location || "";
   const { payhereUrl, formData } = buildPayoutPaymentParams({
     orderId: String(request._id),
     amount: request.amount,
     partnerName,
     partnerEmail,
+    partnerPhone,
+    partnerAddress,
+    partnerCity,
   });
   res.json({ payhereUrl, formData });
 }
