@@ -161,10 +161,15 @@ export async function approvePayoutRequest(requestId) {
     err.statusCode = 404;
     throw err;
   }
+  // Already paid? Skip (idempotent - safe to call multiple times)
   if (request.status === "Paid") {
-    const err = new Error("Payout request already paid");
-    err.statusCode = 400;
-    throw err;
+    console.log("[Payout] Already paid, skipping:", requestId);
+    return {
+      _id: request._id,
+      status: "Paid",
+      transactionId: request.transactionId,
+      message: "Payout request already processed",
+    };
   }
   if (request.status === "Rejected") {
     const err = new Error("Cannot approve a rejected payout request");

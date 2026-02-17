@@ -8,6 +8,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { DollarSign, Loader2, Wallet } from "lucide-react";
+import toast from "react-hot-toast";
 import useAuth from "../../hooks/useAuth";
 import { getPartnerEarnings, createPayoutRequest } from "../../services/partnerService";
 import PaymentHistoryTable from "../../components/PaymentHistoryTable";
@@ -92,9 +93,19 @@ export default function EarningsPage() {
               setRequesting(true);
               try {
                 const created = await createPayoutRequest(token, amt);
-                setAvailableBalance((prev) => prev); // balance is deducted after admin approval
                 setRequestAmount("");
-                // Optional: show inline success text
+                setRequestError("");
+
+                // Show success toast
+                toast.success("Payout request submitted successfully! Admin will review it shortly.", {
+                  duration: 4000,
+                  iconTheme: { primary: "#80134D" }
+                });
+
+                // Refresh data to show the new request
+                const data = await getPartnerEarnings(token);
+                setAvailableBalance(data?.availableBalance ?? 0);
+                setPayouts(Array.isArray(data?.payouts) ? data.payouts : []);
               } catch (err) {
                 setRequestError(
                   err.response?.data?.message || "Failed to create payout request."

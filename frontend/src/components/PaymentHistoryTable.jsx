@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  XCircle,
 } from "lucide-react";
 
 const DEFAULT_ACCENT = "#80134D";
@@ -144,6 +145,7 @@ export default function PaymentHistoryTable({
               <option value="all">All status</option>
               <option value="Pending">Pending</option>
               <option value="Paid">Paid</option>
+              <option value="Rejected">Rejected</option>
             </select>
             <select
               value={monthFilter}
@@ -225,6 +227,11 @@ export default function PaymentHistoryTable({
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
                           <CheckCircle className="w-3.5 h-3.5" />
                           Paid
+                        </span>
+                      ) : p.status === "Rejected" ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                          <XCircle className="w-3.5 h-3.5" />
+                          Rejected
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">

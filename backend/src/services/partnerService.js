@@ -175,7 +175,8 @@ export async function syncPartnerAvailableBalance(partnerId) {
 }
 
 /**
- * Build a Payment History row from a paid PayoutRequest (same shape as Payout for the table).
+ * Build a Payment History row from a PayoutRequest (same shape as Payout for the table).
+ * Shows actual status (Pending/Paid/Rejected) instead of hardcoded "Paid".
  */
 function payoutRequestToHistoryRow(pr) {
   const date = pr.updatedAt || pr.createdAt;
@@ -185,9 +186,11 @@ function payoutRequestToHistoryRow(pr) {
     month: month || "",
     totalTokens: 0,
     totalAmount: pr.amount ?? 0,
-    status: "Paid",
+    status: pr.status || "Pending",
     transactionId: pr.transactionId || "",
+    rejectionReason: pr.rejectionReason || "",
     source: "payout_request",
+    createdAt: pr.createdAt,
   };
 }
 
@@ -204,8 +207,8 @@ export async function getEarningsSummary(partnerId) {
     Payout.find({ partnerId }).sort({ month: -1 }).lean(),
     PayoutRequest.find({ partnerId }).sort({ createdAt: -1 }).lean(),
   ]);
-  const paidRequests = (requests || []).filter((r) => r.status === "Paid");
-  const requestRows = paidRequests.map(payoutRequestToHistoryRow);
+  // Show ALL payout requests (Pending, Paid, Rejected) in payment history
+  const requestRows = (requests || []).map(payoutRequestToHistoryRow);
   const payouts = [...monthlyPayouts, ...requestRows].sort((a, b) => {
     const ma = a.month || "";
     const mb = b.month || "";

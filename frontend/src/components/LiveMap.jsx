@@ -462,6 +462,7 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
   const [routeDuration, setRouteDuration] = useState(null); // seconds
   const [routeDurationText, setRouteDurationText] = useState(""); // e.g. "1 h 55 min" from saved route
   const [savedWeatherCondition, setSavedWeatherCondition] = useState(""); // weather when route was saved (for View on Map)
+  const [routeNeedsRecalc, setRouteNeedsRecalc] = useState(false); // track if route changed but hasn't recalculated yet
 
   /* ── Manual route (Start / End search) ── */
   const [startPlace, setStartPlace] = useState(null);
@@ -487,14 +488,14 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
   const prevPosRef = useRef(null);
   const sessionDistRef = useRef(0);
   const mapRef = useRef(null);
-  const mapModeRef = useRef("report");
+  const mapModeRef = useRef("route");
   const userPosRef = useRef(null);
   const hasCenteredRef = useRef(false);
   const startPlaceRef = useRef(null);
   const endPlaceRef = useRef(null);
   const appliedSavedRouteRef = useRef(false);
 
-  const [mapMode, setMapMode] = useState("report");
+  const [mapMode, setMapMode] = useState("route");
 
   /* ── InfoWindow selection ── */
   const [selectedUser, setSelectedUser] = useState(false);
@@ -524,27 +525,37 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
       lng: typeof p.lng === "number" ? p.lng : Number(p.lng),
     })).filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
     if (path.length < 2) return;
-    setRouteCoords(path);
-    setStartPlace({
-      lat: path[0].lat,
-      lng: path[0].lng,
-      label: initialRoute.startLocation || "Start",
-    });
-    setEndPlace({
-      lat: path[path.length - 1].lat,
-      lng: path[path.length - 1].lng,
-      label: initialRoute.endLocation || "End",
-    });
-    setStartQuery(initialRoute.startLocation || "");
-    setEndQuery(initialRoute.endLocation || "");
-    const distNum = typeof initialRoute.distance === "string"
-      ? parseFloat(initialRoute.distance.replace(/[^\d.]/g, "")) || null
-      : initialRoute.distance;
-    setRouteDistance(distNum);
-    setRouteDuration(null);
-    setRouteDurationText(initialRoute.duration || "");
-    setSavedWeatherCondition(initialRoute.weatherCondition || "");
-    appliedSavedRouteRef.current = true;
+
+    // Clear any existing route first
+    setRouteCoords([]);
+    setTargetPos(null);
+
+    // Then set the new route (triggers re-render)
+    setTimeout(() => {
+      setRouteCoords(path);
+      setStartPlace({
+        lat: path[0].lat,
+        lng: path[0].lng,
+        label: initialRoute.startLocation || "Start",
+      });
+      setEndPlace({
+        lat: path[path.length - 1].lat,
+        lng: path[path.length - 1].lng,
+        label: initialRoute.endLocation || "End",
+      });
+      setStartQuery(initialRoute.startLocation || "");
+      setEndQuery(initialRoute.endLocation || "");
+      const distNum = typeof initialRoute.distance === "string"
+        ? parseFloat(initialRoute.distance.replace(/[^\d.]/g, "")) || null
+        : initialRoute.distance;
+      setRouteDistance(distNum);
+      setRouteDuration(null);
+      setRouteDurationText(initialRoute.duration || "");
+      setSavedWeatherCondition(initialRoute.weatherCondition || "");
+      appliedSavedRouteRef.current = true;
+    }, 100);
+
+    // Fit bounds to show full path
     setTimeout(() => {
       if (mapRef.current && path.length && typeof window !== "undefined" && window.google?.maps?.LatLngBounds) {
         const bounds = new window.google.maps.LatLngBounds();
@@ -906,6 +917,15 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
     return () => clearTimeout(t);
   }, [endQuery]);
 
+  /* When start or end changes, mark as needing recalc and allow OSRM to recalculate */
+  useEffect(() => {
+    if (startPlace && endPlace && routeCoords.length > 0 && appliedSavedRouteRef.current) {
+      // Reset the flag so OSRM can recalculate when editing
+      appliedSavedRouteRef.current = false;
+      setRouteNeedsRecalc(true);
+    }
+  }, [startPlace?.lat, startPlace?.lng, endPlace?.lat, endPlace?.lng]);
+
   /* Fetch OSRM route when both Start and End are set (skip if we just loaded a saved route) */
   useEffect(() => {
     if (!startPlace || !endPlace || !mapRef.current || appliedSavedRouteRef.current) return;
@@ -936,7 +956,10 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
         setRouteDistance(parseFloat(haversineKm(startPlace.lat, startPlace.lng, endPlace.lat, endPlace.lng).toFixed(2)));
         setRouteDuration(null);
       })
-      .finally(() => setRouteLoading(false));
+      .finally(() => {
+        setRouteLoading(false);
+        setRouteNeedsRecalc(false); // Clear the flag when OSRM finishes
+      });
   }, [startPlace?.lat, startPlace?.lng, endPlace?.lat, endPlace?.lng]);
 
   /* Fetch weather at destination (Open-Meteo) */
@@ -1010,21 +1033,21 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
         <div className="flex gap-0.5 sm:gap-1 bg-white rounded-lg sm:rounded-xl shadow-lg p-0.5 sm:p-1">
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setMapMode("report"); clearRoute(); }}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
-              mapMode === "report" ? "bg-red-500 text-white" : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Report
-          </button>
-          <button
-            type="button"
             onClick={(e) => { e.stopPropagation(); setMapMode("route"); setClickedPos(null); setSelectedReport(false); }}
             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
               mapMode === "route" ? "bg-emerald-500 text-white" : "text-slate-600 hover:bg-slate-50"
             }`}
           >
             <Navigation className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Route
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setMapMode("report"); setClickedPos(null); setSelectedReport(false); }}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
+              mapMode === "report" ? "bg-red-500 text-white" : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Report
           </button>
         </div>
 
@@ -1036,8 +1059,26 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
 
         {routeDistance !== null && (
           <div className="bg-white/90 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 max-w-[160px] sm:max-w-[200px] border border-white/40">
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-800 mb-0.5 sm:mb-1">Route</p>
+            {isEditMode && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-2 py-1 rounded-md mb-1.5 flex items-center gap-1">
+                <Pencil className="w-3 h-3 shrink-0" />
+                <span className="text-[9px] sm:text-[10px] font-semibold">Editing Route</span>
+              </div>
+            )}
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-800 mb-0.5 sm:mb-1">
+              {isEditMode ? "Updated Route" : "Route"}
+            </p>
             <p className="text-base sm:text-lg font-bold text-primary">{routeDistance} km</p>
+            {isEditMode && initialRoute?.distance && (
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                Original: {typeof initialRoute.distance === "string" ? initialRoute.distance : `${initialRoute.distance} km`}
+                {routeDistance !== parseFloat(String(initialRoute.distance).replace(/[^\d.]/g, "")) && (
+                  <span className="text-blue-600 font-semibold ml-1">
+                    {routeDistance > parseFloat(String(initialRoute.distance).replace(/[^\d.]/g, "")) ? "↑" : "↓"}
+                  </span>
+                )}
+              </p>
+            )}
             {(routeDuration != null || routeDurationText) && (
               <p className="text-xs text-slate-500 mt-0.5">
                 {routeDuration != null ? `~${formatDuration(routeDuration)} by bike` : routeDurationText ? `~${routeDurationText} by bike` : ""}
@@ -1048,11 +1089,17 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
                 <span className="text-slate-400">When saved:</span> {savedWeatherCondition}
               </p>
             )}
+            {routeNeedsRecalc && (
+              <div className="text-[9px] sm:text-[10px] text-amber-600 flex items-center gap-1 mt-1 bg-amber-50 border border-amber-200 px-1.5 py-1 rounded">
+                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                Recalculating route...
+              </div>
+            )}
             <div className="mt-1.5 sm:mt-2 flex flex-col gap-1">
               <button
                 type="button"
                 onClick={handleSaveRoute}
-                disabled={savingRoute}
+                disabled={savingRoute || routeLoading}
                 className="w-full flex items-center justify-center gap-1 text-[10px] sm:text-xs font-semibold bg-primary text-white py-1.5 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
               >
                 {savingRoute ? <Loader2 className="w-3 h-3 animate-spin" /> : <MapPin className="w-3 h-3" />}
@@ -1070,32 +1117,34 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
           </div>
         )}
 
-        {/* ── Start / End search (glassmorphism) ── */}
-        <div className="bg-white/80 backdrop-blur-md rounded-lg sm:rounded-xl shadow-lg border border-white/40 p-2 sm:p-2.5 space-y-1.5 sm:space-y-2 min-w-[160px] sm:min-w-[200px]">
-          <p className="text-[10px] sm:text-xs font-semibold text-slate-600 uppercase tracking-wide">Plan route</p>
-          <LocationSearchInput
-            placeholder="Start location"
-            value={startQuery}
-            onChange={setStartQuery}
-            suggestions={startSuggestions}
-            onSelect={(s) => { setStartPlace({ lat: s.lat, lng: s.lng, label: s.display_name || s.label }); setStartQuery(s.display_name || s.label || ""); setShowStartDropdown(false); }}
-            loading={startSearching}
-            showDropdown={showStartDropdown}
-            onFocus={() => setShowStartDropdown(true)}
-            onBlur={() => setShowStartDropdown(false)}
-          />
-          <LocationSearchInput
-            placeholder="End location"
-            value={endQuery}
-            onChange={setEndQuery}
-            suggestions={endSuggestions}
-            onSelect={(s) => { setEndPlace({ lat: s.lat, lng: s.lng, label: s.display_name || s.label }); setEndQuery(s.display_name || s.label || ""); setShowEndDropdown(false); }}
-            loading={endSearching}
-            showDropdown={showEndDropdown}
-            onFocus={() => setShowEndDropdown(true)}
-            onBlur={() => setShowEndDropdown(false)}
-          />
-        </div>
+        {/* ── Start / End search (glassmorphism) - Only show in route mode ── */}
+        {mapMode === "route" && (
+          <div className="bg-white/80 backdrop-blur-md rounded-lg sm:rounded-xl shadow-lg border border-white/40 p-2 sm:p-2.5 space-y-1.5 sm:space-y-2 w-[140px] sm:w-[170px]">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-600 uppercase tracking-wide">Plan route</p>
+            <LocationSearchInput
+              placeholder="Start location"
+              value={startQuery}
+              onChange={setStartQuery}
+              suggestions={startSuggestions}
+              onSelect={(s) => { setStartPlace({ lat: s.lat, lng: s.lng, label: s.display_name || s.label }); setStartQuery(s.display_name || s.label || ""); setShowStartDropdown(false); }}
+              loading={startSearching}
+              showDropdown={showStartDropdown}
+              onFocus={() => setShowStartDropdown(true)}
+              onBlur={() => setShowStartDropdown(false)}
+            />
+            <LocationSearchInput
+              placeholder="End location"
+              value={endQuery}
+              onChange={setEndQuery}
+              suggestions={endSuggestions}
+              onSelect={(s) => { setEndPlace({ lat: s.lat, lng: s.lng, label: s.display_name || s.label }); setEndQuery(s.display_name || s.label || ""); setShowEndDropdown(false); }}
+              loading={endSearching}
+              showDropdown={showEndDropdown}
+              onFocus={() => setShowEndDropdown(true)}
+              onBlur={() => setShowEndDropdown(false)}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Session distance & save ── */}
@@ -1349,8 +1398,8 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
             path={routeCoords}
             options={{
               strokeColor: isEditMode ? "#22C55E" : "#10b981",
-              strokeWeight: 5,
-              strokeOpacity: 0.9,
+              strokeWeight: isEditMode ? 6 : 5,
+              strokeOpacity: isEditMode ? 1.0 : 0.9,
             }}
           />
         )}

@@ -306,26 +306,105 @@ export default function AdminDashboard() {
       // Get payment parameters from backend
       const { formData } = await getPayhereInit(token, requestId);
 
+      // Track if payment was completed
+      let paymentCompleted = false;
+      let pollAttempts = 0;
+      const maxPollAttempts = 15; // Poll for 30 seconds (15 × 2s)
+
+      // Polling function to check status
+      const pollForStatusUpdate = async () => {
+        if (pollAttempts >= maxPollAttempts) {
+          toast.info("Payment may still be processing. Refresh the page to see the latest status.", {
+            duration: 5000,
+            iconTheme: { primary: MAROON }
+          });
+          return;
+        }
+
+        try {
+          const requests = await getPayoutRequests(token);
+          const updatedRequest = requests.find(r => r._id === requestId);
+
+          if (updatedRequest && updatedRequest.status === "Paid") {
+            // Status updated successfully
+            setPayoutRequests(requests);
+            toast.success("Payment successful! Payout request has been processed.", {
+              duration: 5000,
+              iconTheme: { primary: MAROON }
+            });
+            return;
+          }
+
+          // Continue polling
+          pollAttempts++;
+          setTimeout(pollForStatusUpdate, 2000);
+        } catch (err) {
+          console.error("Poll error:", err);
+          pollAttempts++;
+          if (pollAttempts < maxPollAttempts) {
+            setTimeout(pollForStatusUpdate, 2000);
+          }
+        }
+      };
+
       // Configure PayHere callbacks
-      window.payhere.onCompleted = function onCompleted(orderId) {
+      window.payhere.onCompleted = async function onCompleted(orderId) {
         console.log("Payment completed. OrderID:", orderId);
-        toast.success("Payment successful! Payout request will be updated shortly.", {
-          duration: 5000,
+        paymentCompleted = true;
+
+        toast.success("Payment successful! Updating status...", {
+          duration: 3000,
           iconTheme: { primary: MAROON }
         });
-        // Refresh payout requests to show updated status
-        setTimeout(() => {
-          if (token) {
-            getPayoutRequests(token).then(setPayoutRequests).catch(() => {});
+
+        try {
+          // Call backend to mark as paid immediately
+          const BASE = import.meta.env.VITE_API_URL ?? "";
+          const API_URL = BASE ? `${BASE}/payments` : "/api/payments";
+          const response = await fetch(`${API_URL}/payhere/mark-paid`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ orderId: orderId })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            console.log("[PayHere] Status updated successfully");
+
+            // Refresh payout requests to show updated status
+            const requests = await getPayoutRequests(token);
+            setPayoutRequests(requests);
+
+            toast.success("Payment processed! Payout request completed.", {
+              duration: 5000,
+              iconTheme: { primary: MAROON }
+            });
+          } else {
+            throw new Error(data.message || "Failed to update status");
           }
-        }, 2000);
+
+        } catch (err) {
+          console.error("[PayHere] Failed to update status:", err);
+          toast.error("Payment succeeded but status update failed. Please refresh the page.", {
+            duration: 6000
+          });
+
+          // Fallback: still try polling as backup
+          setTimeout(pollForStatusUpdate, 2000);
+        }
       };
 
       window.payhere.onDismissed = function onDismissed() {
         console.log("Payment dismissed");
-        toast.info("Payment cancelled", {
-          iconTheme: { primary: MAROON }
-        });
+        if (!paymentCompleted) {
+          toast.info("Payment cancelled", {
+            iconTheme: { primary: MAROON }
+          });
+        }
       };
 
       window.payhere.onError = function onError(error) {

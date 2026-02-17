@@ -29,3 +29,38 @@ export async function payhereNotify(req, res) {
   }
   res.status(200).send("OK");
 }
+
+/**
+ * Mark payout request as paid after PayHere onCompleted callback
+ * Called from frontend when payment succeeds
+ */
+export async function markPayoutPaid(req, res) {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ message: "Missing orderId" });
+    }
+
+    console.log("[PayHere] Frontend callback - marking as paid:", orderId);
+
+    // Import payout service
+    const payoutService = await import("../services/payoutService.js");
+    await payoutService.approvePayoutRequest(orderId);
+
+    console.log("[PayHere] ✅ Payout request marked as Paid via frontend callback:", orderId);
+
+    return res.json({
+      success: true,
+      message: "Payout request marked as paid",
+      orderId
+    });
+
+  } catch (err) {
+    console.error("[PayHere] ❌ Failed to mark as paid:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to update status"
+    });
+  }
+}
