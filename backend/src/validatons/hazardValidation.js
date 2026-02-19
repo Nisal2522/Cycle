@@ -16,3 +16,7 @@ export const updateHazardSchema = Joi.object({
   type: Joi.string().valid(...HAZARD_TYPES).optional(),
   description: Joi.string().trim().max(200).allow("").optional(),
 }).min(1);
+
+export const verifyHazardSchema = Joi.object({
+  status: Joi.string().valid("exists", "resolved", "spam").required(),
+});

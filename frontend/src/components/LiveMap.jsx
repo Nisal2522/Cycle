@@ -59,6 +59,8 @@ import {
   CloudLightning,
   CloudFog,
   ThermometerSun,
+  CheckCircle,
+  Flag,
 } from "lucide-react";
 
 const DEFAULT_CENTER = { lat: 6.9271, lng: 79.8612 };
@@ -292,13 +294,23 @@ function MapLoadingSkeleton({ message }) {
    the map click handler from firing underneath.
    ────────────────────────────────────────────── */
 
-function HazardPopupContent({ hazard, isOwn, token, onUpdate, onDelete }) {
+function HazardPopupContent({ hazard, isOwn, token, userId, onUpdate, onDelete }) {
   const [mode, setMode] = useState("view");
   const [editType, setEditType] = useState(hazard.type);
   const [editDesc, setEditDesc] = useState(hazard.description || "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [userVerification, setUserVerification] = useState(null);
+
+  useEffect(() => {
+    // Check if current user has already verified this hazard
+    const myVerification = hazard.verifications?.find(
+      v => String(v.userId?._id || v.userId) === String(userId)
+    );
+    setUserVerification(myVerification);
+  }, [hazard, userId]);
 
   const stop = (e) => e?.stopPropagation?.();
 
@@ -341,6 +353,27 @@ function HazardPopupContent({ hazard, isOwn, token, onUpdate, onDelete }) {
     }
   };
 
+  const handleVerify = async (status) => {
+    setVerifying(true);
+    try {
+      const response = await axios.post(
+        `/api/hazards/${hazard._id}/verify`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      onUpdate(response.data);
+      toast.success(
+        status === "exists" ? "Marked as still exists" :
+        status === "resolved" ? "Marked as resolved" :
+        "Reported as spam"
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to verify");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   /* ── View mode ── */
   if (mode === "view") {
     return (
@@ -352,8 +385,31 @@ function HazardPopupContent({ hazard, isOwn, token, onUpdate, onDelete }) {
             <span className="text-[9px] font-bold uppercase bg-[#871053]/10 text-[#871053] px-1.5 py-0.5 rounded ml-auto">Yours</span>
           )}
         </div>
+
+        {/* Status badge */}
+        {hazard.status && hazard.status !== "reported" && (
+          <div className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded mb-1 inline-block ${
+            hazard.status === "verified" ? "bg-blue-100 text-blue-700" :
+            hazard.status === "resolved" ? "bg-green-100 text-green-700" :
+            hazard.status === "invalid" ? "bg-red-100 text-red-700" :
+            "bg-slate-100 text-slate-600"
+          }`}>
+            {hazard.status}
+          </div>
+        )}
+
         {hazard.description && <p className="text-xs text-slate-600 mb-1.5 leading-relaxed">{hazard.description}</p>}
         <p className="text-[10px] text-slate-400">By {hazard.reportedBy?.name || "Unknown"}</p>
+
+        {/* Verification counts */}
+        {(hazard.existsCount > 0 || hazard.resolvedCount > 0) && (
+          <div className="text-[10px] text-slate-500 mb-1.5">
+            {hazard.existsCount > 0 && <span>✓ {hazard.existsCount} confirmed</span>}
+            {hazard.resolvedCount > 0 && <span className="ml-2">✓ {hazard.resolvedCount} resolved</span>}
+          </div>
+        )}
+
+        {/* Owner actions (Edit/Delete) */}
         {isOwn && (
           <div className="flex gap-1.5 mt-2 pt-2 border-t border-slate-100">
             <button type="button" onClick={openEdit} className="flex-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 py-1.5 rounded-lg transition-colors">
@@ -362,6 +418,54 @@ function HazardPopupContent({ hazard, isOwn, token, onUpdate, onDelete }) {
             <button type="button" onClick={(e) => { stop(e); setMode("confirmDelete"); }} className="flex-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 py-1.5 rounded-lg transition-colors">
               <Trash2 className="w-3 h-3" /> Delete
             </button>
+          </div>
+        )}
+
+        {/* Community validation (for non-owners) */}
+        {!isOwn && hazard.status !== "resolved" && hazard.status !== "invalid" && (
+          <div className="mt-2 pt-2 border-t border-slate-100">
+            <p className="text-[10px] text-slate-500 mb-1.5">
+              {userVerification ? "You marked this as:" : "Is this hazard accurate?"}
+            </p>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={(e) => { stop(e); handleVerify("exists"); }}
+                disabled={verifying}
+                className={`flex-1 flex items-center justify-center gap-0.5 text-[10px] font-semibold py-1.5 rounded-md transition-colors ${
+                  userVerification?.status === "exists"
+                    ? "bg-green-500 text-white"
+                    : "bg-green-50 text-green-600 hover:bg-green-100"
+                }`}
+              >
+                <Check className="w-3 h-3" /> Still exists
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { stop(e); handleVerify("resolved"); }}
+                disabled={verifying}
+                className={`flex-1 flex items-center justify-center gap-0.5 text-[10px] font-semibold py-1.5 rounded-md transition-colors ${
+                  userVerification?.status === "resolved"
+                    ? "bg-blue-500 text-white"
+                    : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                }`}
+              >
+                <CheckCircle className="w-3 h-3" /> Resolved
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { stop(e); handleVerify("spam"); }}
+                disabled={verifying}
+                className={`px-2 flex items-center justify-center text-[10px] font-semibold py-1.5 rounded-md transition-colors ${
+                  userVerification?.status === "spam"
+                    ? "bg-red-500 text-white"
+                    : "bg-red-50 text-red-600 hover:bg-red-100"
+                }`}
+                title="Report as spam"
+              >
+                <Flag className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -991,7 +1095,7 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
 
   const isOwnHazard = (h) => {
     const reporterId = h.reportedBy?._id || h.reportedBy;
-    return reporterId === userId;
+    return String(reporterId) === String(userId);
   };
 
   /* ── Early returns — loading / error ── */
@@ -1273,6 +1377,7 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
                     hazard={h}
                     isOwn={own}
                     token={token}
+                    userId={userId}
                     onUpdate={handleHazardUpdate}
                     onDelete={handleHazardDelete}
                   />

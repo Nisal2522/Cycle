@@ -86,3 +86,27 @@ export async function deleteHazard(token, id) {
   );
   return data;
 }
+
+/**
+ * Verify a hazard (community validation).
+ * @param {string} token
+ * @param {string} id — Hazard ObjectId
+ * @param {"exists" | "resolved" | "spam"} status — Verification status
+ */
+export async function verifyHazard(token, id, status) {
+  const { data } = await axiosClient.post(
+    `${API_URL}/${id}/verify`,
+    { status },
+    authHeader(token)
+  );
+  return data;
+}
+
+/**
+ * Get verification details for a hazard.
+ * @param {string} id — Hazard ObjectId
+ */
+export async function getHazardVerifications(id) {
+  const { data } = await axiosClient.get(`${API_URL}/${id}/verifications`);
+  return data;
+}

@@ -105,10 +105,11 @@ const TABS = [
   { id: "overview", label: "Overview", icon: ShieldCheck },
   { id: "users", label: "Users & Partners", icon: Users },
   { id: "routes", label: "Route Moderation", icon: Route },
+  { id: "hazards", label: "Hazard Reports", icon: AlertTriangle },
   { id: "payouts", label: "Payout Management", icon: DollarSign },
 ];
 
-const VALID_TABS = ["overview", "users", "routes", "payouts"];
+const VALID_TABS = ["overview", "users", "routes", "hazards", "payouts"];
 
 export default function AdminDashboard() {
   const { user, token } = useAuth();
@@ -144,6 +145,7 @@ export default function AdminDashboard() {
   const [payouts, setPayouts] = useState([]);
   const [payments, setPayments] = useState([]);
   const [payoutRequests, setPayoutRequests] = useState([]);
+  const [hazards, setHazards] = useState([]);
 
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -152,6 +154,7 @@ export default function AdminDashboard() {
   const [loadingPayouts, setLoadingPayouts] = useState(false);
   const [loadingPayoutRequests, setLoadingPayoutRequests] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [loadingHazards, setLoadingHazards] = useState(false);
 
   const [actioning, setActioning] = useState(null);
   const [actioningRouteId, setActioningRouteId] = useState(null);
@@ -233,6 +236,25 @@ export default function AdminDashboard() {
       .finally(() => {
         setLoadingRoutes(false);
         setLoadingPending(false);
+      });
+  }, [activeTab, token]);
+
+  useEffect(() => {
+    if (activeTab !== "hazards" || !token) return;
+    setLoadingHazards(true);
+    import("../services/hazardService")
+      .then((module) => module.getHazards())
+      .then((data) => {
+        setHazards(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        const msg = err.response?.status === 401
+          ? "Session expired or not authorized. Please sign in again."
+          : err.response?.data?.message || "Failed to load hazards";
+        toast.error(msg);
+      })
+      .finally(() => {
+        setLoadingHazards(false);
       });
   }, [activeTab, token]);
 
@@ -506,6 +528,61 @@ export default function AdminDashboard() {
       toast.error(e.response?.data?.message || "Failed to reject");
     } finally {
       setActioningRouteId(null);
+    }
+  };
+
+  const handleModerateHazard = async (hazardId, updates) => {
+    setActioning(hazardId);
+    try {
+      const { default: axios } = await import("axios");
+      const { data } = await axios.patch(
+        `/api/hazards/${hazardId}/moderate`,
+        updates,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setHazards((prev) => prev.map((h) => (h._id === hazardId ? data : h)));
+      toast.success("Hazard moderated", { iconTheme: { primary: MAROON } });
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to moderate hazard");
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const handleForceDeleteHazard = async (hazardId) => {
+    if (!window.confirm("Delete this hazard report? This cannot be undone.")) return;
+    setActioning(hazardId);
+    try {
+      const { default: axios } = await import("axios");
+      await axios.delete(`/api/hazards/${hazardId}/force`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setHazards((prev) => prev.filter((h) => h._id !== hazardId));
+      toast.success("Hazard deleted", { iconTheme: { primary: MAROON } });
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete hazard");
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const handleCleanupStaleHazards = async () => {
+    if (!window.confirm("Mark all stale hazards (30+ days, no verifications) as expired?")) return;
+    setActioning("cleanup");
+    try {
+      const { default: axios } = await import("axios");
+      const { data } = await axios.post("/api/hazards/cleanup", {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(data.message || "Cleanup complete", { iconTheme: { primary: MAROON } });
+      // Refresh hazards list
+      const hazardModule = await import("../services/hazardService");
+      const updatedHazards = await hazardModule.getHazards();
+      setHazards(Array.isArray(updatedHazards) ? updatedHazards : []);
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to cleanup hazards");
+    } finally {
+      setActioning(null);
     }
   };
 
@@ -1241,6 +1318,176 @@ export default function AdminDashboard() {
             )}
             </motion.div>
           </>
+        )}
+
+        {/* Hazard Reports Management */}
+        {activeTab === "hazards" && (
+          <motion.div
+            custom={0}
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            className="bg-white rounded-3xl overflow-hidden border border-slate-200/60"
+            style={{
+              boxShadow: "0 0 0 1px rgba(15,23,42,0.03), 0 2px 4px rgba(15,23,42,0.04), 0 12px 24px rgba(15,23,42,0.08)",
+            }}
+          >
+            <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 to-red-500" />
+            <div className="px-6 sm:px-8 py-6 border-b border-slate-100" style={{ background: "linear-gradient(180deg, rgba(248,250,252,0.8) 0%, rgba(255,255,255,1) 100%)" }}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shrink-0 bg-gradient-to-br from-amber-500 to-red-500">
+                    <AlertTriangle className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800 tracking-tight">Hazard Reports</h2>
+                    <p className="text-sm text-slate-500 mt-0.5">Moderate community-reported hazards and cleanup stale reports</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {loadingHazards && (
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+                      <span>Loading…</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleCleanupStaleHazards}
+                    disabled={actioning === "cleanup"}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm disabled:opacity-50 transition-all"
+                  >
+                    {actioning === "cleanup" ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    Cleanup Stale Hazards
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto max-w-full">
+              <table className="w-full min-w-[800px]">
+                <thead>
+                  <tr className="text-left text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-200/80">
+                    <th className="px-6 py-4 pl-8">Type & Description</th>
+                    <th className="px-6 py-4">Reporter</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Verifications</th>
+                    <th className="px-6 py-4">Created</th>
+                    <th className="px-6 py-4 pr-8 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {hazards.map((h, idx) => (
+                    <motion.tr
+                      key={h._id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: idx * 0.02 }}
+                      className={`group border-b border-slate-100 transition-all duration-200 ${
+                        idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                      } hover:bg-amber-50/30 hover:border-l-4 hover:border-l-amber-500`}
+                      style={{ borderLeftColor: "transparent" }}
+                    >
+                      <td className="px-6 py-4 pl-8">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold uppercase bg-red-100 text-red-700">
+                              {h.type}
+                            </span>
+                            {!h.active && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold uppercase bg-slate-200 text-slate-600">
+                                Hidden
+                              </span>
+                            )}
+                          </div>
+                          {h.description && (
+                            <p className="text-sm text-slate-600 max-w-md truncate">{h.description}</p>
+                          )}
+                          <p className="text-xs text-slate-400">
+                            Lat: {h.lat?.toFixed(6)}, Lng: {h.lng?.toFixed(6)}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-slate-700">
+                          {h.reportedBy?.name || "Unknown"}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                          h.status === "verified" ? "bg-blue-100 text-blue-700" :
+                          h.status === "resolved" ? "bg-green-100 text-green-700" :
+                          h.status === "invalid" ? "bg-red-100 text-red-700" :
+                          "bg-slate-100 text-slate-600"
+                        }`}>
+                          {h.status || "reported"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1 text-xs text-slate-600">
+                          <span>✓ {h.existsCount || 0} exists</span>
+                          <span>✓ {h.resolvedCount || 0} resolved</span>
+                          <span>🚩 {h.spamCount || 0} spam</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {h.createdAt ? new Date(h.createdAt).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-6 py-4 pr-8 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {h.status !== "invalid" && (
+                            <button
+                              type="button"
+                              onClick={() => handleModerateHazard(h._id, { status: "invalid", active: false, moderationNote: "Marked as invalid by admin" })}
+                              disabled={actioning === h._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 text-xs font-semibold disabled:opacity-50 transition-all"
+                            >
+                              {actioning === h._id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                              Mark Invalid
+                            </button>
+                          )}
+                          {h.status !== "resolved" && (
+                            <button
+                              type="button"
+                              onClick={() => handleModerateHazard(h._id, { status: "resolved", moderationNote: "Marked as resolved by admin" })}
+                              disabled={actioning === h._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 text-xs font-semibold disabled:opacity-50 transition-all"
+                            >
+                              {actioning === h._id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                              Mark Resolved
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleForceDeleteHazard(h._id)}
+                            disabled={actioning === h._id}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-xs font-semibold disabled:opacity-50 transition-all"
+                          >
+                            {actioning === h._id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {hazards.length === 0 && !loadingHazards && (
+              <div className="py-20 px-8 text-center">
+                <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-5 bg-gradient-to-br from-amber-100 to-red-100">
+                  <AlertTriangle className="w-10 h-10 text-amber-600" />
+                </div>
+                <p className="text-lg font-bold text-slate-700">No hazard reports</p>
+                <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto">
+                  Community-reported hazards will appear here for moderation.
+                </p>
+              </div>
+            )}
+          </motion.div>
         )}
 
         {/* Payout Management — mobile responsive */}
