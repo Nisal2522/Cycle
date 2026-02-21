@@ -7,6 +7,7 @@
 import User from "../models/User.js";
 import Reward from "../models/Reward.js";
 import Ride from "../models/Ride.js";
+import Route from "../models/Route.js";
 import { ROLES } from "../constants.js";
 import { CO2_PER_KM, TOKENS_PER_KM, MAX_DISTANCE_KM, LIMITS } from "../constants.js";
 
@@ -31,6 +32,10 @@ export async function getStats(userId) {
   };
 }
 
+/**
+ * Legacy: Quick save ride (backward compatibility).
+ * Creates an instant completed ride without start/end flow.
+ */
 export async function updateDistance(userId, body) {
   const { distance, startLocation, endLocation, duration } = body;
   const user = await User.findById(userId);
@@ -54,6 +59,9 @@ export async function updateDistance(userId, body) {
     durationText: duration != null ? String(duration).trim() : "",
     tokensEarned,
     co2Saved: co2Earned,
+    status: "completed", // Mark as completed
+    startedAt: new Date(),
+    endedAt: new Date(),
   });
   return {
     message: "Ride recorded successfully!",
@@ -67,6 +75,153 @@ export async function updateDistance(userId, body) {
       totalRides: user.totalRides,
     },
   };
+}
+
+/**
+ * Start a new ride (optionally linked to a saved route).
+ */
+export async function startRide(userId, body) {
+  const { routeId, startLocation } = body;
+
+  // Check if user already has an active ride
+  const activeRide = await Ride.findOne({
+    cyclistId: userId,
+    status: { $in: ["active", "paused"] },
+  });
+
+  if (activeRide) {
+    const err = new Error("You already have an active ride. Please end it first.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Validate routeId if provided
+  if (routeId) {
+    const route = await Route.findById(routeId);
+    if (!route) {
+      const err = new Error("Route not found");
+      err.statusCode = 404;
+      throw err;
+    }
+  }
+
+  const ride = await Ride.create({
+    cyclistId: userId,
+    routeId: routeId || null,
+    startLocation: startLocation || "Current Location",
+    startedAt: new Date(),
+    distance: 0,
+    tokensEarned: 0,
+    co2Saved: 0,
+    status: "active",
+  });
+
+  // Populate route details if linked
+  await ride.populate("routeId", "startLocation endLocation distance");
+
+  return ride;
+}
+
+/**
+ * End an active ride and finalize stats.
+ */
+export async function endRide(userId, rideId, body) {
+  const { distance, endLocation, duration } = body;
+
+  const ride = await Ride.findById(rideId);
+  if (!ride) {
+    const err = new Error("Ride not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (ride.cyclistId.toString() !== userId.toString()) {
+    const err = new Error("You can only end your own rides");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (ride.status === "completed" || ride.status === "cancelled") {
+    const err = new Error("Ride already ended");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Calculate rewards
+  const tokensEarned = Math.round(distance * TOKENS_PER_KM);
+  const co2Earned = parseFloat((distance * CO2_PER_KM).toFixed(2));
+
+  // Update ride
+  ride.status = "completed";
+  ride.endedAt = new Date();
+  ride.distance = parseFloat(distance.toFixed(2));
+  ride.endLocation = endLocation || "Current Location";
+  ride.durationText = duration || "";
+  ride.tokensEarned = tokensEarned;
+  ride.co2Saved = co2Earned;
+
+  await ride.save();
+
+  // Update user stats
+  const user = await User.findById(userId);
+  user.totalDistance += ride.distance;
+  user.co2Saved += co2Earned;
+  user.tokens += tokensEarned;
+  user.totalRides += 1;
+  await user.save();
+
+  return {
+    ride,
+    rewards: { tokensEarned, co2Earned, distance: ride.distance },
+    totals: {
+      tokens: user.tokens,
+      totalDistance: parseFloat(user.totalDistance.toFixed(2)),
+      co2Saved: parseFloat(user.co2Saved.toFixed(2)),
+      totalRides: user.totalRides,
+    },
+  };
+}
+
+/**
+ * Get user's active ride (if any).
+ */
+export async function getActiveRide(userId) {
+  const ride = await Ride.findOne({
+    cyclistId: userId,
+    status: { $in: ["active", "paused"] },
+  }).populate("routeId", "startLocation endLocation distance");
+
+  return ride;
+}
+
+/**
+ * Cancel an active ride (no stats updated).
+ */
+export async function cancelRide(userId, rideId) {
+  const ride = await Ride.findById(rideId);
+  if (!ride) {
+    const err = new Error("Ride not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (ride.cyclistId.toString() !== userId.toString()) {
+    const err = new Error("You can only cancel your own rides");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (ride.status === "completed" || ride.status === "cancelled") {
+    const err = new Error("Ride already ended");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  ride.status = "cancelled";
+  ride.endedAt = new Date();
+  await ride.save();
+
+  return { message: "Ride cancelled" };
 }
 
 export async function getRides(userId, period, search) {

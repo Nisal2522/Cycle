@@ -167,12 +167,25 @@ export default function AuthProvider({ children }) {
 
   /**
    * Log out — clears state and localStorage.
+   * FIX (2026-02-21): Clear all auth state to prevent stale data.
    */
   const logout = useCallback(() => {
+    // Clear React state
     setUser(null);
     setToken(null);
+    setError("");
+    setLoading(false);
+
+    // Clear localStorage
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+
+    // Clear any session storage as well (defensive)
+    try {
+      sessionStorage.clear();
+    } catch {
+      // Ignore errors
+    }
   }, []);
 
   /**

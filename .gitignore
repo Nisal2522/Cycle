@@ -24,6 +24,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 PAYHERE_INTEGRATION.md
+RBAC_AUDIT_SUMMARY.md
+RBAC_GUIDE.md
+frontend/docs/
 
 # Vite
 vite.config.js.timestamp-*

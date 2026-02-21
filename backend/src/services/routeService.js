@@ -28,6 +28,7 @@ export async function getPublicRoutes() {
     $or: [{ status: ROUTE_STATUS.APPROVED }, { status: { $exists: false } }],
   })
     .populate("creatorId", "name")
+    .select("startLocation endLocation path distance duration weatherCondition averageRating ratingCount createdAt")
     .sort({ createdAt: -1 })
     .lean()
     .limit(LIMITS.ROUTES_PUBLIC);
@@ -84,4 +85,107 @@ export async function deleteRoute(routeId, userId) {
   }
   await Route.findByIdAndDelete(routeId);
   return { message: "Route deleted successfully" };
+}
+
+/**
+ * Add or update a rating for a route.
+ */
+export async function rateRoute(userId, routeId, body) {
+  const { rating, comment } = body;
+
+  const route = await Route.findById(routeId);
+  if (!route) {
+    const err = new Error("Route not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Check if user already rated this route
+  const existingRatingIndex = route.ratings.findIndex(
+    (r) => r.userId.toString() === userId.toString()
+  );
+
+  if (existingRatingIndex !== -1) {
+    // Update existing rating
+    route.ratings[existingRatingIndex].rating = rating;
+    route.ratings[existingRatingIndex].comment = comment || "";
+    route.ratings[existingRatingIndex].createdAt = new Date();
+  } else {
+    // Add new rating
+    route.ratings.push({
+      userId,
+      rating,
+      comment: comment || "",
+      createdAt: new Date(),
+    });
+  }
+
+  // Recalculate average rating
+  const totalRating = route.ratings.reduce((sum, r) => sum + r.rating, 0);
+  route.averageRating = parseFloat((totalRating / route.ratings.length).toFixed(2));
+  route.ratingCount = route.ratings.length;
+
+  await route.save();
+  await route.populate("ratings.userId", "name");
+
+  return route;
+}
+
+/**
+ * Get ratings for a route.
+ */
+export async function getRouteRatings(routeId) {
+  const route = await Route.findById(routeId)
+    .populate("ratings.userId", "name")
+    .select("ratings averageRating ratingCount");
+
+  if (!route) {
+    const err = new Error("Route not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return {
+    averageRating: route.averageRating,
+    ratingCount: route.ratingCount,
+    ratings: route.ratings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+  };
+}
+
+/**
+ * Delete a rating (user can remove their own rating).
+ */
+export async function deleteRating(userId, routeId) {
+  const route = await Route.findById(routeId);
+  if (!route) {
+    const err = new Error("Route not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const ratingIndex = route.ratings.findIndex(
+    (r) => r.userId.toString() === userId.toString()
+  );
+
+  if (ratingIndex === -1) {
+    const err = new Error("Rating not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  route.ratings.splice(ratingIndex, 1);
+
+  // Recalculate average
+  if (route.ratings.length > 0) {
+    const totalRating = route.ratings.reduce((sum, r) => sum + r.rating, 0);
+    route.averageRating = parseFloat((totalRating / route.ratings.length).toFixed(2));
+    route.ratingCount = route.ratings.length;
+  } else {
+    route.averageRating = 0;
+    route.ratingCount = 0;
+  }
+
+  await route.save();
+
+  return { message: "Rating deleted" };
 }

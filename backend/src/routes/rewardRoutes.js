@@ -3,16 +3,17 @@
  * --------------------------------------------------
  * Partner reward management routes.
  *
- * POST   /api/rewards               → createReward
- * GET    /api/rewards/partner/:id   → getPartnerRewards
- * PATCH  /api/rewards/:id           → updateReward
- * DELETE /api/rewards/:id           → deleteReward
+ * POST   /api/rewards               → createReward (partner only)
+ * GET    /api/rewards/partner/:id   → getPartnerRewards (partner only)
+ * PATCH  /api/rewards/:id           → updateReward (partner only)
+ * DELETE /api/rewards/:id           → deleteReward (partner only)
  * --------------------------------------------------
  */
 
 import express from "express";
 import asyncHandler from "express-async-handler";
 import { protect } from "../middleware/authMiddleware.js";
+import { partnerOnly } from "../middleware/role.js";
 import {
   createReward,
   getPartnerRewards,
@@ -22,10 +23,13 @@ import {
 
 const router = express.Router();
 
-router.post("/", protect, asyncHandler(createReward));
-router.get("/partner/:id", protect, asyncHandler(getPartnerRewards));
-router.patch("/:id", protect, asyncHandler(updateReward));
-router.delete("/:id", protect, asyncHandler(deleteReward));
+// 🔒 All reward management requires partner role
+router.use(protect, partnerOnly);
+
+router.post("/", asyncHandler(createReward));
+router.get("/partner/:id", asyncHandler(getPartnerRewards));
+router.patch("/:id", asyncHandler(updateReward));
+router.delete("/:id", asyncHandler(deleteReward));
 
 export default router;
 

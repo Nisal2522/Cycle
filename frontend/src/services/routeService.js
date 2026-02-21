@@ -57,3 +57,40 @@ export async function deleteRoute(token, routeId) {
   const { data } = await axiosClient.delete(`${API_URL}/${routeId}`, authHeader(token));
   return data;
 }
+
+/**
+ * Rate a route (add or update rating).
+ * @param {string} token - JWT
+ * @param {string} routeId - Route ID
+ * @param {object} payload - { rating: 1-5, comment?: string }
+ */
+export async function rateRoute(token, routeId, payload) {
+  const { data } = await axiosClient.post(
+    `${API_URL}/${routeId}/rate`,
+    payload,
+    authHeader(token)
+  );
+  return data;
+}
+
+/**
+ * Get ratings for a route.
+ * @param {string} routeId - Route ID
+ */
+export async function getRouteRatings(routeId) {
+  const { data } = await axiosClient.get(`${API_URL}/${routeId}/ratings`);
+  return data;
+}
+
+/**
+ * Delete user's rating for a route.
+ * @param {string} token - JWT
+ * @param {string} routeId - Route ID
+ */
+export async function deleteRating(token, routeId) {
+  const { data } = await axiosClient.delete(
+    `${API_URL}/${routeId}/rating`,
+    authHeader(token)
+  );
+  return data;
+}

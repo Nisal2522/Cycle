@@ -35,3 +35,27 @@ export async function deleteRoute(req, res) {
   const data = await routeService.deleteRoute(req.params.id, req.user._id);
   res.json(data);
 }
+
+/**
+ * Rate a route.
+ */
+export async function rateRoute(req, res) {
+  const data = await routeService.rateRoute(req.user._id, req.params.id, req.body);
+  res.json(data);
+}
+
+/**
+ * Get route ratings.
+ */
+export async function getRouteRatings(req, res) {
+  const data = await routeService.getRouteRatings(req.params.id);
+  res.json(data);
+}
+
+/**
+ * Delete a rating.
+ */
+export async function deleteRating(req, res) {
+  const data = await routeService.deleteRating(req.user._id, req.params.id);
+  res.json(data);
+}

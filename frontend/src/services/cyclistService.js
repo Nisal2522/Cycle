@@ -23,7 +23,7 @@ export async function getCyclistStats(token) {
 }
 
 /**
- * Record a completed ride distance (km).
+ * Legacy: Record a completed ride distance (km) instantly.
  * Backend auto-calculates tokens and CO₂ earned.
  * Optional: startLocation, endLocation, duration for trip history.
  */
@@ -35,6 +35,61 @@ export async function updateDistance(token, distance, { startLocation, endLocati
   const { data } = await axiosClient.post(
     `${API_URL}/update-distance`,
     body,
+    authHeader(token)
+  );
+  return data;
+}
+
+/**
+ * Start a new ride (optionally linked to a saved route).
+ * @param {string} token - JWT
+ * @param {object} body - { routeId?: string, startLocation?: string }
+ */
+export async function startRide(token, body = {}) {
+  const { data } = await axiosClient.post(
+    `${API_URL}/rides/start`,
+    body,
+    authHeader(token)
+  );
+  return data;
+}
+
+/**
+ * End an active ride and finalize stats.
+ * @param {string} token - JWT
+ * @param {string} rideId - Ride ID
+ * @param {object} body - { distance: number, endLocation?: string, duration?: string }
+ */
+export async function endRide(token, rideId, body) {
+  const { data } = await axiosClient.post(
+    `${API_URL}/rides/${rideId}/end`,
+    body,
+    authHeader(token)
+  );
+  return data;
+}
+
+/**
+ * Get user's active ride (if any).
+ * @param {string} token - JWT
+ */
+export async function getActiveRide(token) {
+  const { data } = await axiosClient.get(
+    `${API_URL}/rides/active`,
+    authHeader(token)
+  );
+  return data;
+}
+
+/**
+ * Cancel an active ride (no stats updated).
+ * @param {string} token - JWT
+ * @param {string} rideId - Ride ID
+ */
+export async function cancelRide(token, rideId) {
+  const { data } = await axiosClient.post(
+    `${API_URL}/rides/${rideId}/cancel`,
+    {},
     authHeader(token)
   );
   return data;

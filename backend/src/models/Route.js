@@ -17,12 +17,27 @@ const routeSchema = new mongoose.Schema(
     duration: { type: String, trim: true, default: "", maxlength: 30 },
     weatherCondition: { type: String, trim: true, default: "", maxlength: 120 },
     status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+
+    // Ratings & Feedback
+    ratings: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        rating: { type: Number, min: 1, max: 5, required: true },
+        comment: { type: String, trim: true, maxlength: 500, default: "" },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    // Cached aggregates for performance
+    averageRating: { type: Number, min: 0, max: 5, default: 0 },
+    ratingCount: { type: Number, min: 0, default: 0 },
   },
   { timestamps: true }
 );
 
 routeSchema.index({ status: 1 });
 routeSchema.index({ creatorId: 1, createdAt: -1 });
+routeSchema.index({ averageRating: -1 });
 
 const Route = mongoose.model("Route", routeSchema);
 export default Route;

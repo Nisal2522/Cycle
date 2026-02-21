@@ -37,7 +37,13 @@ import {
   updateHazard,
   deleteHazard,
 } from "../services/hazardService";
-import { updateDistance } from "../services/cyclistService";
+import {
+  updateDistance,
+  startRide,
+  endRide,
+  getActiveRide,
+  cancelRide,
+} from "../services/cyclistService";
 import { saveRoute, updateRoute } from "../services/routeService";
 import {
   AlertTriangle,
@@ -587,6 +593,10 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
   /* ── Save route to community ── */
   const [savingRoute, setSavingRoute] = useState(false);
 
+  /* ── Active ride tracking ── */
+  const [activeRide, setActiveRide] = useState(null);
+  const [loadingActiveRide, setLoadingActiveRide] = useState(true);
+
   /* ── Refs ── */
   const nominatimDebounceRef = useRef(null);
   const prevPosRef = useRef(null);
@@ -756,6 +766,29 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
   }, []);
 
   /* ────────────────────────────────────────────
+     Fetch active ride on mount
+     ──────────────────────────────────────────── */
+  useEffect(() => {
+    if (!token) {
+      setLoadingActiveRide(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ride = await getActiveRide(token);
+        if (cancelled) return;
+        setActiveRide(ride);
+      } catch (err) {
+        console.error("[LiveMap] Failed to fetch active ride:", err);
+      } finally {
+        if (!cancelled) setLoadingActiveRide(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  /* ────────────────────────────────────────────
      3. Map click — reads refs so the handler
         always sees current state
      ──────────────────────────────────────────── */
@@ -868,13 +901,32 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
     toast.success("Hazard deleted!");
   };
 
+  const handleStartRide = async (e, routeId = null) => {
+    e?.stopPropagation?.();
+    if (!token) return;
+    try {
+      const ride = await startRide(token, {
+        routeId,
+        startLocation: startPlace?.label || "Current Location",
+      });
+      setActiveRide(ride);
+      sessionDistRef.current = 0;
+      toast.success("Ride started! Start cycling to track distance.");
+    } catch (err) {
+      console.error("Failed to start ride:", err);
+      toast.error(err.response?.data?.message || "Failed to start ride");
+    }
+  };
+
   const handleSaveRide = async (e) => {
     e?.stopPropagation?.();
     const dist = sessionDistRef.current;
     if (dist < 0.01 || !token) return;
+
     try {
       let startLocation = startPlace?.label ?? undefined;
       let endLocation = endPlace?.label ?? undefined;
+
       if (startLocation == null || endLocation == null) {
         if (routeCoords.length >= 2) {
           const [startName, endName] = await Promise.all([
@@ -889,18 +941,51 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
           if (startLocation == null) startLocation = "Start";
         }
       }
+
       const duration = routeDurationText || undefined;
-      const data = await updateDistance(token, parseFloat(dist.toFixed(2)), {
-        startLocation: startLocation || undefined,
-        endLocation: endLocation || undefined,
-        duration,
-      });
+
+      if (activeRide) {
+        // End active ride
+        const result = await endRide(token, activeRide._id, {
+          distance: parseFloat(dist.toFixed(2)),
+          endLocation: endLocation || "Current Location",
+          duration,
+        });
+        setActiveRide(null);
+        toast.success(`Ride completed! +${result.rewards.tokensEarned} tokens earned!`);
+        if (activeRide.routeId) {
+          toast.success("Rate this route to help the community!", { duration: 5000 });
+        }
+        if (onRideUpdate) onRideUpdate(result);
+      } else {
+        // Legacy: Quick save (backward compatibility)
+        const data = await updateDistance(token, parseFloat(dist.toFixed(2)), {
+          startLocation: startLocation || undefined,
+          endLocation: endLocation || undefined,
+          duration,
+        });
+        toast.success("Ride saved!");
+        if (onRideUpdate) onRideUpdate(data);
+      }
+
       sessionDistRef.current = 0;
-      if (onRideUpdate) onRideUpdate(data);
-      toast.success("Ride saved!");
     } catch (err) {
       console.error("Failed to save ride:", err);
-      toast.error("Failed to save ride");
+      toast.error(err.response?.data?.message || "Failed to save ride");
+    }
+  };
+
+  const handleCancelRide = async (e) => {
+    e?.stopPropagation?.();
+    if (!activeRide || !token) return;
+    try {
+      await cancelRide(token, activeRide._id);
+      setActiveRide(null);
+      sessionDistRef.current = 0;
+      toast.success("Ride cancelled");
+    } catch (err) {
+      console.error("Failed to cancel ride:", err);
+      toast.error("Failed to cancel ride");
     }
   };
 
@@ -1254,15 +1339,42 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
       {/* ── Session distance & save ── */}
       <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-[1000]">
         <div className="bg-white/90 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 text-center min-w-[72px] sm:min-w-[90px] border border-white/40">
+          {activeRide && (
+            <p className="text-[9px] sm:text-[10px] font-semibold uppercase text-green-600 leading-tight mb-1 flex items-center gap-1 justify-center">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              Active Ride
+            </p>
+          )}
           <p className="text-[9px] sm:text-[10px] font-semibold uppercase text-slate-400 leading-tight">Session</p>
           <p className="text-sm sm:text-lg font-bold text-primary">{sessionDistRef.current.toFixed(2)} km</p>
-          <button
-            type="button"
-            onClick={handleSaveRide}
-            className="mt-1 sm:mt-1.5 text-[10px] sm:text-[11px] font-semibold bg-primary text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 mx-auto"
-          >
-            <Bike className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Save
-          </button>
+
+          {!activeRide ? (
+            <button
+              type="button"
+              onClick={handleStartRide}
+              disabled={loadingActiveRide}
+              className="mt-1 sm:mt-1.5 text-[10px] sm:text-[11px] font-semibold bg-primary text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 mx-auto disabled:opacity-50"
+            >
+              <Bike className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Start Ride
+            </button>
+          ) : (
+            <div className="flex flex-col gap-1 mt-1 sm:mt-1.5">
+              <button
+                type="button"
+                onClick={handleSaveRide}
+                className="text-[10px] sm:text-[11px] font-semibold bg-green-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 mx-auto"
+              >
+                <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> End Ride
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelRide}
+                className="text-[9px] sm:text-[10px] font-semibold text-red-600 hover:text-red-700 transition-colors flex items-center gap-1 mx-auto"
+              >
+                <X className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> Cancel
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

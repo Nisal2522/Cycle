@@ -25,3 +25,8 @@ export const updateRouteSchema = Joi.object({
   duration: Joi.string().trim().allow("").optional(),
   weatherCondition: Joi.string().trim().allow("").optional(),
 }).min(1);
+
+export const rateRouteSchema = Joi.object({
+  rating: Joi.number().integer().min(1).max(5).required(),
+  comment: Joi.string().trim().max(500).optional().allow(""),
+});

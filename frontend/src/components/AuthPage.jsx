@@ -139,6 +139,8 @@ export default function AuthPage({
   });
 
   // Redirect after success: read user from localStorage (saved synchronously by saveSession) so we don't rely on context update timing
+  // FIX (2026-02-21): Always redirect to role-based dashboard after login to prevent
+  // attempting to access previous user's dashboard with different role
   const fromPath = location.state?.from?.pathname;
   useEffect(() => {
     if (!success) return;
@@ -150,7 +152,16 @@ export default function AuthPage({
       /* ignore */
     }
     if (!storedUser?.role) return;
-    const destination = fromPath || getDashboardPath(storedUser.role);
+
+    // Get role-based dashboard
+    const roleDashboard = getDashboardPath(storedUser.role);
+
+    // Only use fromPath if it's NOT a role-specific dashboard
+    // This prevents admin trying to access /dashboard (cyclist only) after login
+    const roleDashboards = ["/dashboard", "/partner-dashboard", "/admin-panel"];
+    const shouldUseFromPath = fromPath && !roleDashboards.includes(fromPath);
+
+    const destination = shouldUseFromPath ? fromPath : roleDashboard;
     navigate(destination, { replace: true });
   }, [success, fromPath, navigate]);
 

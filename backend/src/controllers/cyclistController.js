@@ -25,6 +25,47 @@ export async function updateDistance(req, res) {
   res.json(data);
 }
 
+/**
+ * Start a new ride.
+ */
+export async function startRide(req, res) {
+  const data = await cyclistService.startRide(req.user._id, req.body);
+  res.status(201).json(data);
+}
+
+/**
+ * End an active ride.
+ */
+export async function endRide(req, res) {
+  const { distance } = req.body;
+  if (!distance || typeof distance !== "number" || distance <= 0) {
+    res.status(400);
+    throw new Error("Distance must be a positive number (in km)");
+  }
+  if (distance > cyclistService.MAX_DISTANCE_KM) {
+    res.status(400);
+    throw new Error(`Distance seems too large. Maximum ${cyclistService.MAX_DISTANCE_KM} km per update.`);
+  }
+  const data = await cyclistService.endRide(req.user._id, req.params.id, req.body);
+  res.json(data);
+}
+
+/**
+ * Get active ride (if any).
+ */
+export async function getActiveRide(req, res) {
+  const data = await cyclistService.getActiveRide(req.user._id);
+  res.json(data);
+}
+
+/**
+ * Cancel an active ride.
+ */
+export async function cancelRide(req, res) {
+  const data = await cyclistService.cancelRide(req.user._id, req.params.id);
+  res.json(data);
+}
+
 export async function getRides(req, res) {
   const period = (req.query.period || "week").toLowerCase();
   const search = (req.query.search || "").trim().toLowerCase();

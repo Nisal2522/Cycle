@@ -47,9 +47,17 @@ export default function LoginPage() {
   }, [location.state?.message]);
 
   // If already logged in, redirect to dashboard
+  // FIX (2026-02-21): Prevent redirect to previous user's dashboard when switching accounts
   useEffect(() => {
     if (user) {
-      const destination = from || getDashboardPath(user.role);
+      const roleDashboard = getDashboardPath(user.role);
+
+      // Only use 'from' path if it's NOT a role-specific dashboard
+      // This prevents admin trying to access /dashboard (cyclist only) after login
+      const roleDashboards = ["/dashboard", "/partner-dashboard", "/admin-panel"];
+      const shouldUseFrom = from && !roleDashboards.includes(from);
+
+      const destination = shouldUseFrom ? from : roleDashboard;
       navigate(destination, { replace: true });
     }
   }, [user, navigate, from]);
