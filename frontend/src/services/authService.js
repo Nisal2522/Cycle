@@ -68,7 +68,8 @@ async function apiRequest(endpoint, options = {}) {
       throw new ApiError(message, response.status);
     }
 
-    return data;
+    // Backend uses responseFormatter: { success, message, data }. Unwrap so callers get the payload.
+    return data?.data !== undefined ? data.data : data;
   } catch (err) {
     // Re-throw ApiError as-is
     if (err instanceof ApiError) {

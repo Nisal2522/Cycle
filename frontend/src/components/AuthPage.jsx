@@ -27,7 +27,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
@@ -51,6 +51,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
+import { getDashboardPath } from "../config/roles";
+import { USER_KEY } from "../constants/auth";
 import { getAuthStats } from "../services/authService";
 import {
   validateSignUpForm,
@@ -108,6 +110,7 @@ export default function AuthPage({
   onBack,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   // ── Auth context (global state) ──
   const { loading, error, register, login, loginWithGoogle, clearError } = useAuth();
 
@@ -134,6 +137,33 @@ export default function AuthPage({
     email: initialEmail,
     password: "",
   });
+
+  // Redirect after success: read user from localStorage (saved synchronously by saveSession) so we don't rely on context update timing
+  // FIX (2026-02-21): Always redirect to role-based dashboard after login to prevent
+  // attempting to access previous user's dashboard with different role
+  const fromPath = location.state?.from?.pathname;
+  useEffect(() => {
+    if (!success) return;
+    let storedUser = null;
+    try {
+      const raw = localStorage.getItem(USER_KEY);
+      storedUser = raw ? JSON.parse(raw) : null;
+    } catch {
+      /* ignore */
+    }
+    if (!storedUser?.role) return;
+
+    // Get role-based dashboard
+    const roleDashboard = getDashboardPath(storedUser.role);
+
+    // Only use fromPath if it's NOT a role-specific dashboard
+    // This prevents admin trying to access /dashboard (cyclist only) after login
+    const roleDashboards = ["/dashboard", "/partner-dashboard", "/admin-panel"];
+    const shouldUseFromPath = fromPath && !roleDashboards.includes(fromPath);
+
+    const destination = shouldUseFromPath ? fromPath : roleDashboard;
+    navigate(destination, { replace: true });
+  }, [success, fromPath, navigate]);
 
   // Sync props when they change
   useEffect(() => setMode(initialMode), [initialMode]);
@@ -241,7 +271,7 @@ export default function AuthPage({
         const ok = await loginWithGoogle(credential);
         if (ok) {
           toast.success("Signed in with Google. Redirecting…");
-          navigate("/dashboard/map", { replace: true });
+          setSuccess("Signed in with Google. Redirecting…");
         } else {
           toast.error("Google sign-in failed. Please try again.");
         }
@@ -517,7 +547,7 @@ export default function AuthPage({
                     className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed w-full"
                   >
                     <GoogleIcon />
-                    Google
+                    {typeof renderProps.text === "string" ? renderProps.text : "Sign in with Google"}
                   </button>
                 )}
               />

@@ -59,8 +59,11 @@ import {
   calculatePayouts,
   processPayout,
   getPayoutRequests,
-  approvePayoutRequest,
+  getPayhereInit,
+  rejectPayoutRequest,
 } from "../services/adminService";
+import BankInfoModal from "../components/admin/BankInfoModal";
+import RejectPayoutRequestModal from "../components/admin/RejectPayoutRequestModal";
 
 ChartJS.register(
   CategoryScale,
@@ -74,6 +77,21 @@ ChartJS.register(
 );
 
 const MAROON = "#80134D";
+
+/** Inline bank details for Pending payouts/requests so Admin can verify before Approve (Requirement vi). */
+function PendingBankDetails({ partner, className = "" }) {
+  const bd = partner?.bankDetails || {};
+  const hasAny = [bd.bankName, bd.branchName, bd.accountNo, bd.accountHolderName].some((v) => v && String(v).trim());
+  if (!hasAny) return <p className={`text-xs text-amber-600 ${className}`}>Bank details not provided</p>;
+  return (
+    <div className={`text-xs text-slate-600 mt-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100 ${className}`}>
+      <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">Verify before approve</p>
+      <p className="font-medium text-slate-700">{bd.bankName || "—"}{bd.branchName ? ` · ${bd.branchName}` : ""}</p>
+      <p className="text-slate-600">Account: <span className="font-mono">{bd.accountNo || "—"}</span> · {bd.accountHolderName || "—"}</p>
+    </div>
+  );
+}
+
 const fadeIn = {
   hidden: { opacity: 0, y: 16 },
   visible: (i) => ({
@@ -87,10 +105,11 @@ const TABS = [
   { id: "overview", label: "Overview", icon: ShieldCheck },
   { id: "users", label: "Users & Partners", icon: Users },
   { id: "routes", label: "Route Moderation", icon: Route },
+  { id: "hazards", label: "Hazard Reports", icon: AlertTriangle },
   { id: "payouts", label: "Payout Management", icon: DollarSign },
 ];
 
-const VALID_TABS = ["overview", "users", "routes", "payouts"];
+const VALID_TABS = ["overview", "users", "routes", "hazards", "payouts"];
 
 export default function AdminDashboard() {
   const { user, token } = useAuth();
@@ -126,6 +145,7 @@ export default function AdminDashboard() {
   const [payouts, setPayouts] = useState([]);
   const [payments, setPayments] = useState([]);
   const [payoutRequests, setPayoutRequests] = useState([]);
+  const [hazards, setHazards] = useState([]);
 
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -134,6 +154,7 @@ export default function AdminDashboard() {
   const [loadingPayouts, setLoadingPayouts] = useState(false);
   const [loadingPayoutRequests, setLoadingPayoutRequests] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [loadingHazards, setLoadingHazards] = useState(false);
 
   const [actioning, setActioning] = useState(null);
   const [actioningRouteId, setActioningRouteId] = useState(null);
@@ -144,6 +165,9 @@ export default function AdminDashboard() {
   const [calculating, setCalculating] = useState(false);
   const [processingPayoutId, setProcessingPayoutId] = useState(null);
   const [processingRequestId, setProcessingRequestId] = useState(null);
+  const [bankModalPartner, setBankModalPartner] = useState(null);
+  const [rejectModalRequest, setRejectModalRequest] = useState(null);
+  const [rejectingRequestId, setRejectingRequestId] = useState(null);
   const [adminApi404, setAdminApi404] = useState(false);
   const [userRoleFilter, setUserRoleFilter] = useState("all"); // "all" | "cyclist" | "partner" | "admin"
   const [growthPeriod, setGrowthPeriod] = useState("thisYear"); // "thisYear" | "thisMonth"
@@ -216,6 +240,25 @@ export default function AdminDashboard() {
   }, [activeTab, token]);
 
   useEffect(() => {
+    if (activeTab !== "hazards" || !token) return;
+    setLoadingHazards(true);
+    import("../services/hazardService")
+      .then((module) => module.getHazards())
+      .then((data) => {
+        setHazards(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        const msg = err.response?.status === 401
+          ? "Session expired or not authorized. Please sign in again."
+          : err.response?.data?.message || "Failed to load hazards";
+        toast.error(msg);
+      })
+      .finally(() => {
+        setLoadingHazards(false);
+      });
+  }, [activeTab, token]);
+
+  useEffect(() => {
     if (activeTab === "payouts" && token) {
       setLoadingPayouts(true);
       setLoadingPayments(true);
@@ -240,6 +283,169 @@ export default function AdminDashboard() {
         .finally(() => setLoadingPayoutRequests(false));
     }
   }, [activeTab, token]);
+
+  // When returning from PayHere in same tab: refetch and show toast
+  useEffect(() => {
+    if (activeTab !== "payouts" || !token || typeof window !== "undefined" && window.opener) return;
+    const payhere = searchParams.get("payhere");
+    if (payhere !== "success") return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("payhere");
+      return next;
+    }, { replace: true });
+    getPayoutRequests(token)
+      .then(setPayoutRequests)
+      .catch(() => {});
+    toast.success("Payment completed. Payout request updated.", { iconTheme: { primary: MAROON } });
+  }, [activeTab, token, searchParams]);
+
+  // When this page is the PayHere return/cancel popup: notify opener and close
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.opener) return;
+    const payhere = searchParams.get("payhere");
+    if (!payhere) return;
+    try {
+      window.opener.postMessage({ type: "payhere-return", payhere }, window.location.origin);
+    } catch (_) {}
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("payhere");
+      return next;
+    }, { replace: true });
+    const id = setTimeout(() => window.close(), 1200);
+    return () => clearTimeout(id);
+  }, [searchParams]);
+
+  // PayHere SDK callbacks handle payment status updates (see handleApproveAndPayPayHere)
+
+  /** Open PayHere checkout using JavaScript SDK modal */
+  const handleApproveAndPayPayHere = async (requestId) => {
+    if (!token) return;
+    setProcessingRequestId(requestId);
+
+    try {
+      // Get payment parameters from backend
+      const { formData } = await getPayhereInit(token, requestId);
+
+      // Track if payment was completed
+      let paymentCompleted = false;
+      let pollAttempts = 0;
+      const maxPollAttempts = 15; // Poll for 30 seconds (15 × 2s)
+
+      // Polling function to check status
+      const pollForStatusUpdate = async () => {
+        if (pollAttempts >= maxPollAttempts) {
+          toast.info("Payment may still be processing. Refresh the page to see the latest status.", {
+            duration: 5000,
+            iconTheme: { primary: MAROON }
+          });
+          return;
+        }
+
+        try {
+          const requests = await getPayoutRequests(token);
+          const updatedRequest = requests.find(r => r._id === requestId);
+
+          if (updatedRequest && updatedRequest.status === "Paid") {
+            // Status updated successfully
+            setPayoutRequests(requests);
+            toast.success("Payment successful! Payout request has been processed.", {
+              duration: 5000,
+              iconTheme: { primary: MAROON }
+            });
+            return;
+          }
+
+          // Continue polling
+          pollAttempts++;
+          setTimeout(pollForStatusUpdate, 2000);
+        } catch (err) {
+          console.error("Poll error:", err);
+          pollAttempts++;
+          if (pollAttempts < maxPollAttempts) {
+            setTimeout(pollForStatusUpdate, 2000);
+          }
+        }
+      };
+
+      // Configure PayHere callbacks
+      window.payhere.onCompleted = async function onCompleted(orderId) {
+        console.log("Payment completed. OrderID:", orderId);
+        paymentCompleted = true;
+
+        toast.success("Payment successful! Updating status...", {
+          duration: 3000,
+          iconTheme: { primary: MAROON }
+        });
+
+        try {
+          // Call backend to mark as paid immediately
+          const BASE = import.meta.env.VITE_API_URL ?? "";
+          const API_URL = BASE ? `${BASE}/payments` : "/api/payments";
+          const response = await fetch(`${API_URL}/payhere/mark-paid`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ orderId: orderId })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            console.log("[PayHere] Status updated successfully");
+
+            // Refresh payout requests to show updated status
+            const requests = await getPayoutRequests(token);
+            setPayoutRequests(requests);
+
+            toast.success("Payment processed! Payout request completed.", {
+              duration: 5000,
+              iconTheme: { primary: MAROON }
+            });
+          } else {
+            throw new Error(data.message || "Failed to update status");
+          }
+
+        } catch (err) {
+          console.error("[PayHere] Failed to update status:", err);
+          toast.error("Payment succeeded but status update failed. Please refresh the page.", {
+            duration: 6000
+          });
+
+          // Fallback: still try polling as backup
+          setTimeout(pollForStatusUpdate, 2000);
+        }
+      };
+
+      window.payhere.onDismissed = function onDismissed() {
+        console.log("Payment dismissed");
+        if (!paymentCompleted) {
+          toast.info("Payment cancelled", {
+            iconTheme: { primary: MAROON }
+          });
+        }
+      };
+
+      window.payhere.onError = function onError(error) {
+        console.log("Payment error:", error);
+        toast.error(`Payment failed: ${error}`, {
+          duration: 6000
+        });
+      };
+
+      // Start PayHere modal
+      window.payhere.startPayment(formData);
+
+    } catch (err) {
+      console.error("PayHere init error:", err);
+      toast.error(err.response?.data?.message || "Failed to initialize payment");
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
 
   const handleVerify = async (u) => {
     setActioning(u._id);
@@ -322,6 +528,61 @@ export default function AdminDashboard() {
       toast.error(e.response?.data?.message || "Failed to reject");
     } finally {
       setActioningRouteId(null);
+    }
+  };
+
+  const handleModerateHazard = async (hazardId, updates) => {
+    setActioning(hazardId);
+    try {
+      const { default: axios } = await import("axios");
+      const { data } = await axios.patch(
+        `/api/hazards/${hazardId}/moderate`,
+        updates,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setHazards((prev) => prev.map((h) => (h._id === hazardId ? data : h)));
+      toast.success("Hazard moderated", { iconTheme: { primary: MAROON } });
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to moderate hazard");
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const handleForceDeleteHazard = async (hazardId) => {
+    if (!window.confirm("Delete this hazard report? This cannot be undone.")) return;
+    setActioning(hazardId);
+    try {
+      const { default: axios } = await import("axios");
+      await axios.delete(`/api/hazards/${hazardId}/force`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setHazards((prev) => prev.filter((h) => h._id !== hazardId));
+      toast.success("Hazard deleted", { iconTheme: { primary: MAROON } });
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete hazard");
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const handleCleanupStaleHazards = async () => {
+    if (!window.confirm("Mark all stale hazards (30+ days, no verifications) as expired?")) return;
+    setActioning("cleanup");
+    try {
+      const { default: axios } = await import("axios");
+      const { data } = await axios.post("/api/hazards/cleanup", {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(data.message || "Cleanup complete", { iconTheme: { primary: MAROON } });
+      // Refresh hazards list
+      const hazardModule = await import("../services/hazardService");
+      const updatedHazards = await hazardModule.getHazards();
+      setHazards(Array.isArray(updatedHazards) ? updatedHazards : []);
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to cleanup hazards");
+    } finally {
+      setActioning(null);
     }
   };
 
@@ -1059,18 +1320,188 @@ export default function AdminDashboard() {
           </>
         )}
 
+        {/* Hazard Reports Management */}
+        {activeTab === "hazards" && (
+          <motion.div
+            custom={0}
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            className="bg-white rounded-3xl overflow-hidden border border-slate-200/60"
+            style={{
+              boxShadow: "0 0 0 1px rgba(15,23,42,0.03), 0 2px 4px rgba(15,23,42,0.04), 0 12px 24px rgba(15,23,42,0.08)",
+            }}
+          >
+            <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 to-red-500" />
+            <div className="px-6 sm:px-8 py-6 border-b border-slate-100" style={{ background: "linear-gradient(180deg, rgba(248,250,252,0.8) 0%, rgba(255,255,255,1) 100%)" }}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shrink-0 bg-gradient-to-br from-amber-500 to-red-500">
+                    <AlertTriangle className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800 tracking-tight">Hazard Reports</h2>
+                    <p className="text-sm text-slate-500 mt-0.5">Moderate community-reported hazards and cleanup stale reports</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {loadingHazards && (
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+                      <span>Loading…</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleCleanupStaleHazards}
+                    disabled={actioning === "cleanup"}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm disabled:opacity-50 transition-all"
+                  >
+                    {actioning === "cleanup" ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    Cleanup Stale Hazards
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto max-w-full">
+              <table className="w-full min-w-[800px]">
+                <thead>
+                  <tr className="text-left text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-200/80">
+                    <th className="px-6 py-4 pl-8">Type & Description</th>
+                    <th className="px-6 py-4">Reporter</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Verifications</th>
+                    <th className="px-6 py-4">Created</th>
+                    <th className="px-6 py-4 pr-8 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {hazards.map((h, idx) => (
+                    <motion.tr
+                      key={h._id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: idx * 0.02 }}
+                      className={`group border-b border-slate-100 transition-all duration-200 ${
+                        idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                      } hover:bg-amber-50/30 hover:border-l-4 hover:border-l-amber-500`}
+                      style={{ borderLeftColor: "transparent" }}
+                    >
+                      <td className="px-6 py-4 pl-8">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold uppercase bg-red-100 text-red-700">
+                              {h.type}
+                            </span>
+                            {!h.active && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold uppercase bg-slate-200 text-slate-600">
+                                Hidden
+                              </span>
+                            )}
+                          </div>
+                          {h.description && (
+                            <p className="text-sm text-slate-600 max-w-md truncate">{h.description}</p>
+                          )}
+                          <p className="text-xs text-slate-400">
+                            Lat: {h.lat?.toFixed(6)}, Lng: {h.lng?.toFixed(6)}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-slate-700">
+                          {h.reportedBy?.name || "Unknown"}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                          h.status === "verified" ? "bg-blue-100 text-blue-700" :
+                          h.status === "resolved" ? "bg-green-100 text-green-700" :
+                          h.status === "invalid" ? "bg-red-100 text-red-700" :
+                          "bg-slate-100 text-slate-600"
+                        }`}>
+                          {h.status || "reported"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1 text-xs text-slate-600">
+                          <span>✓ {h.existsCount || 0} exists</span>
+                          <span>✓ {h.resolvedCount || 0} resolved</span>
+                          <span>🚩 {h.spamCount || 0} spam</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {h.createdAt ? new Date(h.createdAt).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-6 py-4 pr-8 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {h.status !== "invalid" && (
+                            <button
+                              type="button"
+                              onClick={() => handleModerateHazard(h._id, { status: "invalid", active: false, moderationNote: "Marked as invalid by admin" })}
+                              disabled={actioning === h._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 text-xs font-semibold disabled:opacity-50 transition-all"
+                            >
+                              {actioning === h._id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                              Mark Invalid
+                            </button>
+                          )}
+                          {h.status !== "resolved" && (
+                            <button
+                              type="button"
+                              onClick={() => handleModerateHazard(h._id, { status: "resolved", moderationNote: "Marked as resolved by admin" })}
+                              disabled={actioning === h._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 text-xs font-semibold disabled:opacity-50 transition-all"
+                            >
+                              {actioning === h._id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                              Mark Resolved
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleForceDeleteHazard(h._id)}
+                            disabled={actioning === h._id}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-xs font-semibold disabled:opacity-50 transition-all"
+                          >
+                            {actioning === h._id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {hazards.length === 0 && !loadingHazards && (
+              <div className="py-20 px-8 text-center">
+                <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-5 bg-gradient-to-br from-amber-100 to-red-100">
+                  <AlertTriangle className="w-10 h-10 text-amber-600" />
+                </div>
+                <p className="text-lg font-bold text-slate-700">No hazard reports</p>
+                <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto">
+                  Community-reported hazards will appear here for moderation.
+                </p>
+              </div>
+            )}
+          </motion.div>
+        )}
+
         {/* Payout Management — mobile responsive */}
         {activeTab === "payouts" && (
           <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="space-y-4 px-0 sm:px-0">
-            {/* Live Transactions (Stripe Payments) */}
+            {/* Live Transactions (Payments) */}
             <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-100 overflow-hidden">
               <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2">
-                <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate">Live Transactions (Stripe)</h2>
+                <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate">Live Transactions (Payments)</h2>
                 {loadingPayments && <Loader2 className="w-5 h-5 shrink-0 animate-spin" style={{ color: MAROON }} />}
               </div>
               {/* Mobile: cards */}
               <div className="md:hidden divide-y divide-slate-100">
-                {payments.length === 0 && !loadingPayments && <p className="p-4 text-center text-slate-500 text-sm">No Stripe transactions yet.</p>}
+                {payments.length === 0 && !loadingPayments && <p className="p-4 text-center text-slate-500 text-sm">No payment transactions yet.</p>}
                 {payments.map((p) => (
                   <div key={p._id} className="p-3 sm:p-4 flex flex-col gap-1.5">
                     <div className="flex justify-between items-start gap-2">
@@ -1121,7 +1552,7 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-              {payments.length === 0 && !loadingPayments && <p className="hidden md:block p-6 text-center text-slate-500">No Stripe transactions yet.</p>}
+              {payments.length === 0 && !loadingPayments && <p className="hidden md:block p-6 text-center text-slate-500">No payment transactions yet.</p>}
             </div>
             <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-slate-100 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
               <span className="text-sm font-medium text-slate-700">Calculate payouts for month:</span>
@@ -1160,34 +1591,44 @@ export default function AdminDashboard() {
                         <p className="font-medium text-slate-800 text-sm">{r.partnerId?.shopName || r.partnerId?.name || "—"}</p>
                         <p className="text-xs text-slate-400">{r.partnerId?.email}</p>
                       </div>
-                      <span className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
+                      <span className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : r.status === "Rejected" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-800">{r.amount?.toLocaleString()} LKR</p>
+                    <p className="text-xs text-slate-600">Available: <span className="font-medium text-slate-800">{(r.partnerId?.partnerAvailableBalance ?? 0).toLocaleString()} LKR</span></p>
+                    {r.rejectionReason && <p className="text-xs text-red-600">Rejection: {r.rejectionReason}</p>}
                     <p className="text-xs text-slate-500">{r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}</p>
-                    {r.status === "Pending" && (
+                    {r.status === "Pending" && <PendingBankDetails partner={r.partnerId} />}
+                    <div className="flex flex-wrap gap-2 mt-1">
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!token) return;
-                          setProcessingRequestId(r._id);
-                          try {
-                            await approvePayoutRequest(token, r._id);
-                            setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
-                            toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
-                          } catch (err) {
-                            toast.error(err.response?.data?.message || "Failed to approve payout");
-                          } finally {
-                            setProcessingRequestId(null);
-                          }
-                        }}
-                        disabled={processingRequestId === r._id}
-                        className="w-full mt-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
-                        style={{ backgroundColor: MAROON }}
+                        onClick={() => setBankModalPartner(r.partnerId || null)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
                       >
-                        {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                        Approve &amp; Pay
+                        View Bank Info
                       </button>
-                    )}
+                      {r.status === "Pending" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleApproveAndPayPayHere(r._id)}
+                            disabled={processingRequestId === r._id}
+                            className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+                            style={{ backgroundColor: MAROON }}
+                          >
+                            {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                            Approve &amp; Pay
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRejectModalRequest({ id: r._id, partnerName: r.partnerId?.shopName || r.partnerId?.name, amount: r.amount })}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Reject
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1198,6 +1639,7 @@ export default function AdminDashboard() {
                     <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
                       <th className="px-4 py-3">Partner</th>
                       <th className="px-4 py-3">Amount (LKR)</th>
+                      <th className="px-4 py-3">Available (LKR)</th>
                       <th className="px-4 py-3">Requested At</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3 text-right">Action</th>
@@ -1209,37 +1651,47 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800">{r.partnerId?.shopName || r.partnerId?.name || "—"}</p>
                           <p className="text-xs text-slate-400">{r.partnerId?.email}</p>
+                          {r.status === "Pending" && <PendingBankDetails partner={r.partnerId} className="mt-1" />}
                         </td>
                         <td className="px-4 py-3 font-semibold">{r.amount?.toLocaleString()} LKR</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{(r.partnerId?.partnerAvailableBalance ?? 0).toLocaleString()}</td>
                         <td className="px-4 py-3 text-xs text-slate-500">{r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${r.status === "Paid" ? "bg-emerald-100 text-emerald-800" : r.status === "Rejected" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-700"}`}>{r.status}</span>
+                          {r.rejectionReason && <p className="text-xs text-red-600 mt-0.5 max-w-[180px] truncate" title={r.rejectionReason}>{r.rejectionReason}</p>}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {r.status === "Pending" && (
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             <button
                               type="button"
-                              onClick={async () => {
-                                if (!token) return;
-                                setProcessingRequestId(r._id);
-                                try {
-                                  await approvePayoutRequest(token, r._id);
-                                  setPayoutRequests((prev) => prev.map((x) => (x._id === r._id ? { ...x, status: "Paid" } : x)));
-                                  toast.success("Payout approved and paid", { iconTheme: { primary: MAROON } });
-                                } catch (err) {
-                                  toast.error(err.response?.data?.message || "Failed to approve payout");
-                                } finally {
-                                  setProcessingRequestId(null);
-                                }
-                              }}
-                              disabled={processingRequestId === r._id}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
-                              style={{ backgroundColor: MAROON }}
+                              onClick={() => setBankModalPartner(r.partnerId || null)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
                             >
-                              {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                              Approve &amp; Pay
+                              View Bank Info
                             </button>
-                          )}
+                            {r.status === "Pending" && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveAndPayPayHere(r._id)}
+                                  disabled={processingRequestId === r._id}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-60"
+                                  style={{ backgroundColor: MAROON }}
+                                >
+                                  {processingRequestId === r._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                                  Approve &amp; Pay
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setRejectModalRequest({ id: r._id, partnerName: r.partnerId?.shopName || r.partnerId?.name, amount: r.amount })}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1271,19 +1723,30 @@ export default function AdminDashboard() {
                       <span>{p.totalTokens} tokens</span>
                       <span className="font-semibold text-slate-800">{p.totalAmount?.toLocaleString()} LKR</span>
                     </div>
+                    <p className="text-xs text-slate-600">Available: <span className="font-medium text-slate-800">{(p.partnerId?.partnerAvailableBalance ?? 0).toLocaleString()} LKR</span></p>
                     {p.status === "Paid" && p.transactionId && <p className="text-xs text-slate-400 font-mono break-all">{p.transactionId}</p>}
-                    {p.status === "Pending" && (
+                    {p.status === "Pending" && <PendingBankDetails partner={p.partnerId} />}
+                    <div className="flex flex-wrap gap-2 mt-1">
                       <button
                         type="button"
-                        onClick={() => handleProcessPayout(p)}
-                        disabled={processingPayoutId === p._id}
-                        className="w-full mt-1 py-2.5 rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1"
-                        style={{ backgroundColor: MAROON }}
+                        onClick={() => setBankModalPartner(p.partnerId || null)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
                       >
-                        {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                        Process Payout
+                        View Bank Info
                       </button>
-                    )}
+                      {p.status === "Pending" && (
+                        <button
+                          type="button"
+                          onClick={() => handleProcessPayout(p)}
+                          disabled={processingPayoutId === p._id}
+                          className="py-2.5 px-3 rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1"
+                          style={{ backgroundColor: MAROON }}
+                        >
+                          {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                          Process Payout
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1296,6 +1759,7 @@ export default function AdminDashboard() {
                       <th className="px-4 py-3">Month</th>
                       <th className="px-4 py-3">Tokens Redeemed</th>
                       <th className="px-4 py-3">Amount (LKR)</th>
+                      <th className="px-4 py-3">Available (LKR)</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3 text-right">Action</th>
                     </tr>
@@ -1306,27 +1770,38 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800">{p.partnerId?.shopName || p.partnerId?.name || "—"}</p>
                           <p className="text-xs text-slate-400">{p.partnerId?.email}</p>
+                          {p.status === "Pending" && <PendingBankDetails partner={p.partnerId} className="mt-1" />}
                         </td>
                         <td className="px-4 py-3">{p.month}</td>
                         <td className="px-4 py-3">{p.totalTokens}</td>
                         <td className="px-4 py-3 font-medium">{p.totalAmount?.toLocaleString()} LKR</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{(p.partnerId?.partnerAvailableBalance ?? 0).toLocaleString()}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{p.status}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {p.status === "Pending" && (
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             <button
                               type="button"
-                              onClick={() => handleProcessPayout(p)}
-                              disabled={processingPayoutId === p._id}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-50"
-                              style={{ backgroundColor: MAROON }}
+                              onClick={() => setBankModalPartner(p.partnerId || null)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
                             >
-                              {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                              Process Payout
+                              View Bank Info
                             </button>
-                          )}
-                          {p.status === "Paid" && p.transactionId && <span className="text-xs text-slate-400">{p.transactionId}</span>}
+                            {p.status === "Pending" && (
+                              <button
+                                type="button"
+                                onClick={() => handleProcessPayout(p)}
+                                disabled={processingPayoutId === p._id}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-semibold disabled:opacity-50"
+                                style={{ backgroundColor: MAROON }}
+                              >
+                                {processingPayoutId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                                Process Payout
+                              </button>
+                            )}
+                            {p.status === "Paid" && p.transactionId && <span className="text-xs text-slate-400">{p.transactionId}</span>}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1347,6 +1822,45 @@ export default function AdminDashboard() {
           onApprove={handleApproveRoute}
           onReject={handleRejectRoute}
           actioning={actioningRouteId === previewRoute._id}
+        />
+      )}
+
+      {/* Bank details modal — partner account info for payouts */}
+      {bankModalPartner && (
+        <BankInfoModal
+          partner={bankModalPartner}
+          onClose={() => setBankModalPartner(null)}
+        />
+      )}
+
+      {/* Reject payout request modal — reason required */}
+      {rejectModalRequest && (
+        <RejectPayoutRequestModal
+          requestId={rejectModalRequest.id}
+          partnerName={rejectModalRequest.partnerName}
+          amount={rejectModalRequest.amount}
+          onClose={() => { setRejectModalRequest(null); setRejectingRequestId(null); }}
+          onConfirm={async (rejectionReason) => {
+            if (!token) return;
+            setRejectingRequestId(rejectModalRequest.id);
+            try {
+              await rejectPayoutRequest(token, rejectModalRequest.id, { rejectionReason });
+              setPayoutRequests((prev) =>
+                prev.map((x) =>
+                  x._id === rejectModalRequest.id
+                    ? { ...x, status: "Rejected", rejectionReason }
+                    : x
+                )
+              );
+              toast.success("Payout request rejected", { iconTheme: { primary: MAROON } });
+              setRejectModalRequest(null);
+            } catch (err) {
+              toast.error(err.response?.data?.message || "Failed to reject request");
+            } finally {
+              setRejectingRequestId(null);
+            }
+          }}
+          loading={rejectingRequestId === rejectModalRequest.id}
         />
       )}
     </div>

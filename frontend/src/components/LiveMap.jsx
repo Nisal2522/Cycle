@@ -37,7 +37,13 @@ import {
   updateHazard,
   deleteHazard,
 } from "../services/hazardService";
-import { updateDistance } from "../services/cyclistService";
+import {
+  updateDistance,
+  startRide,
+  endRide,
+  getActiveRide,
+  cancelRide,
+} from "../services/cyclistService";
 import { saveRoute, updateRoute } from "../services/routeService";
 import {
   AlertTriangle,
@@ -59,6 +65,8 @@ import {
   CloudLightning,
   CloudFog,
   ThermometerSun,
+  CheckCircle,
+  Flag,
 } from "lucide-react";
 
 const DEFAULT_CENTER = { lat: 6.9271, lng: 79.8612 };
@@ -199,6 +207,22 @@ function weatherFromCode(code) {
    Location search input (Nominatim autocomplete)
    ────────────────────────────────────────────── */
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+const NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+
+/** Reverse geocode (lat, lng) to a display name. Returns short label or null. */
+async function reverseGeocode(lat, lng) {
+  try {
+    const { data } = await axios.get(NOMINATIM_REVERSE_URL, {
+      params: { lat, lon: lng, format: "json" },
+      headers: { "User-Agent": "CycleLink-App" },
+      timeout: 5000,
+    });
+    const name = data?.address?.road || data?.address?.suburb || data?.address?.neighbourhood || data?.address?.village || data?.address?.town || data?.address?.city || data?.name || data?.display_name?.split(",")[0];
+    return name?.trim() || null;
+  } catch {
+    return null;
+  }
+}
 
 function LocationSearchInput({
   placeholder,
@@ -276,13 +300,23 @@ function MapLoadingSkeleton({ message }) {
    the map click handler from firing underneath.
    ────────────────────────────────────────────── */
 
-function HazardPopupContent({ hazard, isOwn, token, onUpdate, onDelete }) {
+function HazardPopupContent({ hazard, isOwn, token, userId, onUpdate, onDelete }) {
   const [mode, setMode] = useState("view");
   const [editType, setEditType] = useState(hazard.type);
   const [editDesc, setEditDesc] = useState(hazard.description || "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [userVerification, setUserVerification] = useState(null);
+
+  useEffect(() => {
+    // Check if current user has already verified this hazard
+    const myVerification = hazard.verifications?.find(
+      v => String(v.userId?._id || v.userId) === String(userId)
+    );
+    setUserVerification(myVerification);
+  }, [hazard, userId]);
 
   const stop = (e) => e?.stopPropagation?.();
 
@@ -325,6 +359,27 @@ function HazardPopupContent({ hazard, isOwn, token, onUpdate, onDelete }) {
     }
   };
 
+  const handleVerify = async (status) => {
+    setVerifying(true);
+    try {
+      const response = await axios.post(
+        `/api/hazards/${hazard._id}/verify`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      onUpdate(response.data);
+      toast.success(
+        status === "exists" ? "Marked as still exists" :
+        status === "resolved" ? "Marked as resolved" :
+        "Reported as spam"
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to verify");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   /* ── View mode ── */
   if (mode === "view") {
     return (
@@ -336,8 +391,31 @@ function HazardPopupContent({ hazard, isOwn, token, onUpdate, onDelete }) {
             <span className="text-[9px] font-bold uppercase bg-[#871053]/10 text-[#871053] px-1.5 py-0.5 rounded ml-auto">Yours</span>
           )}
         </div>
+
+        {/* Status badge */}
+        {hazard.status && hazard.status !== "reported" && (
+          <div className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded mb-1 inline-block ${
+            hazard.status === "verified" ? "bg-blue-100 text-blue-700" :
+            hazard.status === "resolved" ? "bg-green-100 text-green-700" :
+            hazard.status === "invalid" ? "bg-red-100 text-red-700" :
+            "bg-slate-100 text-slate-600"
+          }`}>
+            {hazard.status}
+          </div>
+        )}
+
         {hazard.description && <p className="text-xs text-slate-600 mb-1.5 leading-relaxed">{hazard.description}</p>}
         <p className="text-[10px] text-slate-400">By {hazard.reportedBy?.name || "Unknown"}</p>
+
+        {/* Verification counts */}
+        {(hazard.existsCount > 0 || hazard.resolvedCount > 0) && (
+          <div className="text-[10px] text-slate-500 mb-1.5">
+            {hazard.existsCount > 0 && <span>✓ {hazard.existsCount} confirmed</span>}
+            {hazard.resolvedCount > 0 && <span className="ml-2">✓ {hazard.resolvedCount} resolved</span>}
+          </div>
+        )}
+
+        {/* Owner actions (Edit/Delete) */}
         {isOwn && (
           <div className="flex gap-1.5 mt-2 pt-2 border-t border-slate-100">
             <button type="button" onClick={openEdit} className="flex-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 py-1.5 rounded-lg transition-colors">
@@ -346,6 +424,54 @@ function HazardPopupContent({ hazard, isOwn, token, onUpdate, onDelete }) {
             <button type="button" onClick={(e) => { stop(e); setMode("confirmDelete"); }} className="flex-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 py-1.5 rounded-lg transition-colors">
               <Trash2 className="w-3 h-3" /> Delete
             </button>
+          </div>
+        )}
+
+        {/* Community validation (for non-owners) */}
+        {!isOwn && hazard.status !== "resolved" && hazard.status !== "invalid" && (
+          <div className="mt-2 pt-2 border-t border-slate-100">
+            <p className="text-[10px] text-slate-500 mb-1.5">
+              {userVerification ? "You marked this as:" : "Is this hazard accurate?"}
+            </p>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={(e) => { stop(e); handleVerify("exists"); }}
+                disabled={verifying}
+                className={`flex-1 flex items-center justify-center gap-0.5 text-[10px] font-semibold py-1.5 rounded-md transition-colors ${
+                  userVerification?.status === "exists"
+                    ? "bg-green-500 text-white"
+                    : "bg-green-50 text-green-600 hover:bg-green-100"
+                }`}
+              >
+                <Check className="w-3 h-3" /> Still exists
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { stop(e); handleVerify("resolved"); }}
+                disabled={verifying}
+                className={`flex-1 flex items-center justify-center gap-0.5 text-[10px] font-semibold py-1.5 rounded-md transition-colors ${
+                  userVerification?.status === "resolved"
+                    ? "bg-blue-500 text-white"
+                    : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                }`}
+              >
+                <CheckCircle className="w-3 h-3" /> Resolved
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { stop(e); handleVerify("spam"); }}
+                disabled={verifying}
+                className={`px-2 flex items-center justify-center text-[10px] font-semibold py-1.5 rounded-md transition-colors ${
+                  userVerification?.status === "spam"
+                    ? "bg-red-500 text-white"
+                    : "bg-red-50 text-red-600 hover:bg-red-100"
+                }`}
+                title="Report as spam"
+              >
+                <Flag className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -446,6 +572,7 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
   const [routeDuration, setRouteDuration] = useState(null); // seconds
   const [routeDurationText, setRouteDurationText] = useState(""); // e.g. "1 h 55 min" from saved route
   const [savedWeatherCondition, setSavedWeatherCondition] = useState(""); // weather when route was saved (for View on Map)
+  const [routeNeedsRecalc, setRouteNeedsRecalc] = useState(false); // track if route changed but hasn't recalculated yet
 
   /* ── Manual route (Start / End search) ── */
   const [startPlace, setStartPlace] = useState(null);
@@ -466,19 +593,23 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
   /* ── Save route to community ── */
   const [savingRoute, setSavingRoute] = useState(false);
 
+  /* ── Active ride tracking ── */
+  const [activeRide, setActiveRide] = useState(null);
+  const [loadingActiveRide, setLoadingActiveRide] = useState(true);
+
   /* ── Refs ── */
   const nominatimDebounceRef = useRef(null);
   const prevPosRef = useRef(null);
   const sessionDistRef = useRef(0);
   const mapRef = useRef(null);
-  const mapModeRef = useRef("report");
+  const mapModeRef = useRef("route");
   const userPosRef = useRef(null);
   const hasCenteredRef = useRef(false);
   const startPlaceRef = useRef(null);
   const endPlaceRef = useRef(null);
   const appliedSavedRouteRef = useRef(false);
 
-  const [mapMode, setMapMode] = useState("report");
+  const [mapMode, setMapMode] = useState("route");
 
   /* ── InfoWindow selection ── */
   const [selectedUser, setSelectedUser] = useState(false);
@@ -508,27 +639,37 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
       lng: typeof p.lng === "number" ? p.lng : Number(p.lng),
     })).filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
     if (path.length < 2) return;
-    setRouteCoords(path);
-    setStartPlace({
-      lat: path[0].lat,
-      lng: path[0].lng,
-      label: initialRoute.startLocation || "Start",
-    });
-    setEndPlace({
-      lat: path[path.length - 1].lat,
-      lng: path[path.length - 1].lng,
-      label: initialRoute.endLocation || "End",
-    });
-    setStartQuery(initialRoute.startLocation || "");
-    setEndQuery(initialRoute.endLocation || "");
-    const distNum = typeof initialRoute.distance === "string"
-      ? parseFloat(initialRoute.distance.replace(/[^\d.]/g, "")) || null
-      : initialRoute.distance;
-    setRouteDistance(distNum);
-    setRouteDuration(null);
-    setRouteDurationText(initialRoute.duration || "");
-    setSavedWeatherCondition(initialRoute.weatherCondition || "");
-    appliedSavedRouteRef.current = true;
+
+    // Clear any existing route first
+    setRouteCoords([]);
+    setTargetPos(null);
+
+    // Then set the new route (triggers re-render)
+    setTimeout(() => {
+      setRouteCoords(path);
+      setStartPlace({
+        lat: path[0].lat,
+        lng: path[0].lng,
+        label: initialRoute.startLocation || "Start",
+      });
+      setEndPlace({
+        lat: path[path.length - 1].lat,
+        lng: path[path.length - 1].lng,
+        label: initialRoute.endLocation || "End",
+      });
+      setStartQuery(initialRoute.startLocation || "");
+      setEndQuery(initialRoute.endLocation || "");
+      const distNum = typeof initialRoute.distance === "string"
+        ? parseFloat(initialRoute.distance.replace(/[^\d.]/g, "")) || null
+        : initialRoute.distance;
+      setRouteDistance(distNum);
+      setRouteDuration(null);
+      setRouteDurationText(initialRoute.duration || "");
+      setSavedWeatherCondition(initialRoute.weatherCondition || "");
+      appliedSavedRouteRef.current = true;
+    }, 100);
+
+    // Fit bounds to show full path
     setTimeout(() => {
       if (mapRef.current && path.length && typeof window !== "undefined" && window.google?.maps?.LatLngBounds) {
         const bounds = new window.google.maps.LatLngBounds();
@@ -623,6 +764,29 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
     })();
     return () => { cancelled = true; };
   }, []);
+
+  /* ────────────────────────────────────────────
+     Fetch active ride on mount
+     ──────────────────────────────────────────── */
+  useEffect(() => {
+    if (!token) {
+      setLoadingActiveRide(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ride = await getActiveRide(token);
+        if (cancelled) return;
+        setActiveRide(ride);
+      } catch (err) {
+        console.error("[LiveMap] Failed to fetch active ride:", err);
+      } finally {
+        if (!cancelled) setLoadingActiveRide(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
 
   /* ────────────────────────────────────────────
      3. Map click — reads refs so the handler
@@ -737,25 +901,91 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
     toast.success("Hazard deleted!");
   };
 
+  const handleStartRide = async (e, routeId = null) => {
+    e?.stopPropagation?.();
+    if (!token) return;
+    try {
+      const ride = await startRide(token, {
+        routeId,
+        startLocation: startPlace?.label || "Current Location",
+      });
+      setActiveRide(ride);
+      sessionDistRef.current = 0;
+      toast.success("Ride started! Start cycling to track distance.");
+    } catch (err) {
+      console.error("Failed to start ride:", err);
+      toast.error(err.response?.data?.message || "Failed to start ride");
+    }
+  };
+
   const handleSaveRide = async (e) => {
     e?.stopPropagation?.();
     const dist = sessionDistRef.current;
     if (dist < 0.01 || !token) return;
+
     try {
-      const startLocation = startPlace?.label ?? undefined;
-      const endLocation = endPlace?.label ?? undefined;
+      let startLocation = startPlace?.label ?? undefined;
+      let endLocation = endPlace?.label ?? undefined;
+
+      if (startLocation == null || endLocation == null) {
+        if (routeCoords.length >= 2) {
+          const [startName, endName] = await Promise.all([
+            reverseGeocode(routeCoords[0].lat, routeCoords[0].lng),
+            reverseGeocode(routeCoords[routeCoords.length - 1].lat, routeCoords[routeCoords.length - 1].lng),
+          ]);
+          if (startLocation == null) startLocation = startName || "Start";
+          if (endLocation == null) endLocation = endName || "End";
+        } else if (userPos && userPos.length >= 2) {
+          const endName = await reverseGeocode(userPos[0], userPos[1]);
+          if (endLocation == null) endLocation = endName || "Current location";
+          if (startLocation == null) startLocation = "Start";
+        }
+      }
+
       const duration = routeDurationText || undefined;
-      const data = await updateDistance(token, parseFloat(dist.toFixed(2)), {
-        startLocation,
-        endLocation,
-        duration,
-      });
+
+      if (activeRide) {
+        // End active ride
+        const result = await endRide(token, activeRide._id, {
+          distance: parseFloat(dist.toFixed(2)),
+          endLocation: endLocation || "Current Location",
+          duration,
+        });
+        setActiveRide(null);
+        toast.success(`Ride completed! +${result.rewards.tokensEarned} tokens earned!`);
+        if (activeRide.routeId) {
+          toast.success("Rate this route to help the community!", { duration: 5000 });
+        }
+        if (onRideUpdate) onRideUpdate(result);
+      } else {
+        // Legacy: Quick save (backward compatibility)
+        const data = await updateDistance(token, parseFloat(dist.toFixed(2)), {
+          startLocation: startLocation || undefined,
+          endLocation: endLocation || undefined,
+          duration,
+        });
+        toast.success("Ride saved!");
+        if (onRideUpdate) onRideUpdate(data);
+      }
+
       sessionDistRef.current = 0;
-      if (onRideUpdate) onRideUpdate(data);
-      toast.success("Ride saved!");
     } catch (err) {
       console.error("Failed to save ride:", err);
-      toast.error("Failed to save ride");
+      toast.error(err.response?.data?.message || "Failed to save ride");
+    }
+  };
+
+  const handleCancelRide = async (e) => {
+    e?.stopPropagation?.();
+    if (!activeRide || !token) return;
+    try {
+      await cancelRide(token, activeRide._id);
+      setActiveRide(null);
+      sessionDistRef.current = 0;
+      toast.success("Ride cancelled");
+    } catch (err) {
+      console.error("Failed to cancel ride:", err);
+      toast.error("Failed to cancel ride");
     }
   };
 
@@ -876,6 +1106,15 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
     return () => clearTimeout(t);
   }, [endQuery]);
 
+  /* When start or end changes, mark as needing recalc and allow OSRM to recalculate */
+  useEffect(() => {
+    if (startPlace && endPlace && routeCoords.length > 0 && appliedSavedRouteRef.current) {
+      // Reset the flag so OSRM can recalculate when editing
+      appliedSavedRouteRef.current = false;
+      setRouteNeedsRecalc(true);
+    }
+  }, [startPlace?.lat, startPlace?.lng, endPlace?.lat, endPlace?.lng]);
+
   /* Fetch OSRM route when both Start and End are set (skip if we just loaded a saved route) */
   useEffect(() => {
     if (!startPlace || !endPlace || !mapRef.current || appliedSavedRouteRef.current) return;
@@ -906,7 +1145,10 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
         setRouteDistance(parseFloat(haversineKm(startPlace.lat, startPlace.lng, endPlace.lat, endPlace.lng).toFixed(2)));
         setRouteDuration(null);
       })
-      .finally(() => setRouteLoading(false));
+      .finally(() => {
+        setRouteLoading(false);
+        setRouteNeedsRecalc(false); // Clear the flag when OSRM finishes
+      });
   }, [startPlace?.lat, startPlace?.lng, endPlace?.lat, endPlace?.lng]);
 
   /* Fetch weather at destination (Open-Meteo) */
@@ -938,7 +1180,7 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
 
   const isOwnHazard = (h) => {
     const reporterId = h.reportedBy?._id || h.reportedBy;
-    return reporterId === userId;
+    return String(reporterId) === String(userId);
   };
 
   /* ── Early returns — loading / error ── */
@@ -980,21 +1222,21 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
         <div className="flex gap-0.5 sm:gap-1 bg-white rounded-lg sm:rounded-xl shadow-lg p-0.5 sm:p-1">
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setMapMode("report"); clearRoute(); }}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
-              mapMode === "report" ? "bg-red-500 text-white" : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Report
-          </button>
-          <button
-            type="button"
             onClick={(e) => { e.stopPropagation(); setMapMode("route"); setClickedPos(null); setSelectedReport(false); }}
             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
               mapMode === "route" ? "bg-emerald-500 text-white" : "text-slate-600 hover:bg-slate-50"
             }`}
           >
             <Navigation className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Route
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setMapMode("report"); setClickedPos(null); setSelectedReport(false); }}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
+              mapMode === "report" ? "bg-red-500 text-white" : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Report
           </button>
         </div>
 
@@ -1006,8 +1248,26 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
 
         {routeDistance !== null && (
           <div className="bg-white/90 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 max-w-[160px] sm:max-w-[200px] border border-white/40">
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-800 mb-0.5 sm:mb-1">Route</p>
+            {isEditMode && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-2 py-1 rounded-md mb-1.5 flex items-center gap-1">
+                <Pencil className="w-3 h-3 shrink-0" />
+                <span className="text-[9px] sm:text-[10px] font-semibold">Editing Route</span>
+              </div>
+            )}
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-800 mb-0.5 sm:mb-1">
+              {isEditMode ? "Updated Route" : "Route"}
+            </p>
             <p className="text-base sm:text-lg font-bold text-primary">{routeDistance} km</p>
+            {isEditMode && initialRoute?.distance && (
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                Original: {typeof initialRoute.distance === "string" ? initialRoute.distance : `${initialRoute.distance} km`}
+                {routeDistance !== parseFloat(String(initialRoute.distance).replace(/[^\d.]/g, "")) && (
+                  <span className="text-blue-600 font-semibold ml-1">
+                    {routeDistance > parseFloat(String(initialRoute.distance).replace(/[^\d.]/g, "")) ? "↑" : "↓"}
+                  </span>
+                )}
+              </p>
+            )}
             {(routeDuration != null || routeDurationText) && (
               <p className="text-xs text-slate-500 mt-0.5">
                 {routeDuration != null ? `~${formatDuration(routeDuration)} by bike` : routeDurationText ? `~${routeDurationText} by bike` : ""}
@@ -1018,11 +1278,17 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
                 <span className="text-slate-400">When saved:</span> {savedWeatherCondition}
               </p>
             )}
+            {routeNeedsRecalc && (
+              <div className="text-[9px] sm:text-[10px] text-amber-600 flex items-center gap-1 mt-1 bg-amber-50 border border-amber-200 px-1.5 py-1 rounded">
+                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                Recalculating route...
+              </div>
+            )}
             <div className="mt-1.5 sm:mt-2 flex flex-col gap-1">
               <button
                 type="button"
                 onClick={handleSaveRoute}
-                disabled={savingRoute}
+                disabled={savingRoute || routeLoading}
                 className="w-full flex items-center justify-center gap-1 text-[10px] sm:text-xs font-semibold bg-primary text-white py-1.5 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
               >
                 {savingRoute ? <Loader2 className="w-3 h-3 animate-spin" /> : <MapPin className="w-3 h-3" />}
@@ -1040,46 +1306,75 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
           </div>
         )}
 
-        {/* ── Start / End search (glassmorphism) ── */}
-        <div className="bg-white/80 backdrop-blur-md rounded-lg sm:rounded-xl shadow-lg border border-white/40 p-2 sm:p-2.5 space-y-1.5 sm:space-y-2 min-w-[160px] sm:min-w-[200px]">
-          <p className="text-[10px] sm:text-xs font-semibold text-slate-600 uppercase tracking-wide">Plan route</p>
-          <LocationSearchInput
-            placeholder="Start location"
-            value={startQuery}
-            onChange={setStartQuery}
-            suggestions={startSuggestions}
-            onSelect={(s) => { setStartPlace({ lat: s.lat, lng: s.lng, label: s.display_name || s.label }); setStartQuery(s.display_name || s.label || ""); setShowStartDropdown(false); }}
-            loading={startSearching}
-            showDropdown={showStartDropdown}
-            onFocus={() => setShowStartDropdown(true)}
-            onBlur={() => setShowStartDropdown(false)}
-          />
-          <LocationSearchInput
-            placeholder="End location"
-            value={endQuery}
-            onChange={setEndQuery}
-            suggestions={endSuggestions}
-            onSelect={(s) => { setEndPlace({ lat: s.lat, lng: s.lng, label: s.display_name || s.label }); setEndQuery(s.display_name || s.label || ""); setShowEndDropdown(false); }}
-            loading={endSearching}
-            showDropdown={showEndDropdown}
-            onFocus={() => setShowEndDropdown(true)}
-            onBlur={() => setShowEndDropdown(false)}
-          />
-        </div>
+        {/* ── Start / End search (glassmorphism) - Only show in route mode ── */}
+        {mapMode === "route" && (
+          <div className="bg-white/80 backdrop-blur-md rounded-lg sm:rounded-xl shadow-lg border border-white/40 p-2 sm:p-2.5 space-y-1.5 sm:space-y-2 w-[140px] sm:w-[170px]">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-600 uppercase tracking-wide">Plan route</p>
+            <LocationSearchInput
+              placeholder="Start location"
+              value={startQuery}
+              onChange={setStartQuery}
+              suggestions={startSuggestions}
+              onSelect={(s) => { setStartPlace({ lat: s.lat, lng: s.lng, label: s.display_name || s.label }); setStartQuery(s.display_name || s.label || ""); setShowStartDropdown(false); }}
+              loading={startSearching}
+              showDropdown={showStartDropdown}
+              onFocus={() => setShowStartDropdown(true)}
+              onBlur={() => setShowStartDropdown(false)}
+            />
+            <LocationSearchInput
+              placeholder="End location"
+              value={endQuery}
+              onChange={setEndQuery}
+              suggestions={endSuggestions}
+              onSelect={(s) => { setEndPlace({ lat: s.lat, lng: s.lng, label: s.display_name || s.label }); setEndQuery(s.display_name || s.label || ""); setShowEndDropdown(false); }}
+              loading={endSearching}
+              showDropdown={showEndDropdown}
+              onFocus={() => setShowEndDropdown(true)}
+              onBlur={() => setShowEndDropdown(false)}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Session distance & save ── */}
       <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-[1000]">
         <div className="bg-white/90 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 text-center min-w-[72px] sm:min-w-[90px] border border-white/40">
+          {activeRide && (
+            <p className="text-[9px] sm:text-[10px] font-semibold uppercase text-green-600 leading-tight mb-1 flex items-center gap-1 justify-center">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              Active Ride
+            </p>
+          )}
           <p className="text-[9px] sm:text-[10px] font-semibold uppercase text-slate-400 leading-tight">Session</p>
           <p className="text-sm sm:text-lg font-bold text-primary">{sessionDistRef.current.toFixed(2)} km</p>
-          <button
-            type="button"
-            onClick={handleSaveRide}
-            className="mt-1 sm:mt-1.5 text-[10px] sm:text-[11px] font-semibold bg-primary text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 mx-auto"
-          >
-            <Bike className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Save
-          </button>
+
+          {!activeRide ? (
+            <button
+              type="button"
+              onClick={handleStartRide}
+              disabled={loadingActiveRide}
+              className="mt-1 sm:mt-1.5 text-[10px] sm:text-[11px] font-semibold bg-primary text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 mx-auto disabled:opacity-50"
+            >
+              <Bike className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Start Ride
+            </button>
+          ) : (
+            <div className="flex flex-col gap-1 mt-1 sm:mt-1.5">
+              <button
+                type="button"
+                onClick={handleSaveRide}
+                className="text-[10px] sm:text-[11px] font-semibold bg-green-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 mx-auto"
+              >
+                <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> End Ride
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelRide}
+                className="text-[9px] sm:text-[10px] font-semibold text-red-600 hover:text-red-700 transition-colors flex items-center gap-1 mx-auto"
+              >
+                <X className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> Cancel
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1194,6 +1489,7 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
                     hazard={h}
                     isOwn={own}
                     token={token}
+                    userId={userId}
                     onUpdate={handleHazardUpdate}
                     onDelete={handleHazardDelete}
                   />
@@ -1319,8 +1615,8 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
             path={routeCoords}
             options={{
               strokeColor: isEditMode ? "#22C55E" : "#10b981",
-              strokeWeight: 5,
-              strokeOpacity: 0.9,
+              strokeWeight: isEditMode ? 6 : 5,
+              strokeOpacity: isEditMode ? 1.0 : 0.9,
             }}
           />
         )}

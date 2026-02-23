@@ -172,7 +172,8 @@ export default function Sidebar() {
 
   const handleLogout = () => {
     logout();
-    navigate("/");
+    // Clear navigation state to prevent stale 'from' paths
+    navigate("/", { replace: true, state: {} });
   };
 
   return (

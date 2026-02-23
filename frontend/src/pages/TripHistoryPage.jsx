@@ -222,11 +222,11 @@ export default function TripHistoryPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                            {trip.startLocation}
+                            {trip.startLocation && trip.startLocation !== "—" ? trip.startLocation : "Start"}
                           </p>
                           <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
                           <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                            {trip.endLocation}
+                            {trip.endLocation && trip.endLocation !== "—" ? trip.endLocation : "End"}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-slate-400">
