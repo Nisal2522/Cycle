@@ -2,9 +2,6 @@
 node_modules/
 
 # Environment variables (NEVER commit secrets)
-.env
-.env.local
-.env.production
 
 # Build output
 frontend/dist/
@@ -14,7 +11,6 @@ frontend/dist/
 Thumbs.db
 
 # IDE
-.vscode/
 .idea/
 
 # Logs
@@ -27,7 +23,9 @@ PAYHERE_INTEGRATION.md
 RBAC_AUDIT_SUMMARY.md
 RBAC_GUIDE.md
 frontend/docs/
+backend/docs/
 
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+config.bat

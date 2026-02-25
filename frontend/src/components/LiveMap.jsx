@@ -601,6 +601,7 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
   const nominatimDebounceRef = useRef(null);
   const prevPosRef = useRef(null);
   const sessionDistRef = useRef(0);
+  const activeRideRef = useRef(null);
   const mapRef = useRef(null);
   const mapModeRef = useRef("route");
   const userPosRef = useRef(null);
@@ -695,6 +696,11 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
     if (dist != null) setRouteDistance(dist);
   }, [routeCoords]);
 
+  /* Keep activeRideRef in sync so the GPS watcher ([] deps) can read it */
+  useEffect(() => {
+    activeRideRef.current = activeRide;
+  }, [activeRide]);
+
   /* ────────────────────────────────────────────
      1. GPS tracking — watchPosition + toast on denial
      ──────────────────────────────────────────── */
@@ -711,14 +717,14 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
         setGpsLoading(false);
         setGpsError("");
 
-        if (prevPosRef.current) {
+        if (activeRideRef.current && prevPosRef.current) {
           const dist = haversineKm(
             prevPosRef.current[0], prevPosRef.current[1],
             newPos[0], newPos[1],
           );
           if (dist > 0.005) sessionDistRef.current += dist;
         }
-        prevPosRef.current = newPos;
+        prevPosRef.current = activeRideRef.current ? newPos : null;
 
         /* Center the map only on the FIRST GPS fix */
         if (!hasCenteredRef.current && mapRef.current) {
@@ -911,6 +917,7 @@ export default function LiveMap({ token, userId, onRideUpdate, initialRoute, isE
       });
       setActiveRide(ride);
       sessionDistRef.current = 0;
+      prevPosRef.current = null;
       toast.success("Ride started! Start cycling to track distance.");
     } catch (err) {
       console.error("Failed to start ride:", err);
