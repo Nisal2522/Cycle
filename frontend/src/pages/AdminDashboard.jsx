@@ -22,6 +22,8 @@ import {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import toast from "react-hot-toast";
+import axios from "axios";
+import { getHazards } from "../services/hazardService";
 import {
   Users,
   Map,
@@ -242,8 +244,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (activeTab !== "hazards" || !token) return;
     setLoadingHazards(true);
-    import("../services/hazardService")
-      .then((module) => module.getHazards())
+    getHazards()
       .then((data) => {
         setHazards(Array.isArray(data) ? data : []);
       })
@@ -534,7 +535,6 @@ export default function AdminDashboard() {
   const handleModerateHazard = async (hazardId, updates) => {
     setActioning(hazardId);
     try {
-      const { default: axios } = await import("axios");
       const { data } = await axios.patch(
         `/api/hazards/${hazardId}/moderate`,
         updates,
@@ -553,7 +553,6 @@ export default function AdminDashboard() {
     if (!window.confirm("Delete this hazard report? This cannot be undone.")) return;
     setActioning(hazardId);
     try {
-      const { default: axios } = await import("axios");
       await axios.delete(`/api/hazards/${hazardId}/force`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -570,14 +569,12 @@ export default function AdminDashboard() {
     if (!window.confirm("Mark all stale hazards (30+ days, no verifications) as expired?")) return;
     setActioning("cleanup");
     try {
-      const { default: axios } = await import("axios");
       const { data } = await axios.post("/api/hazards/cleanup", {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success(data.message || "Cleanup complete", { iconTheme: { primary: MAROON } });
       // Refresh hazards list
-      const hazardModule = await import("../services/hazardService");
-      const updatedHazards = await hazardModule.getHazards();
+      const updatedHazards = await getHazards();
       setHazards(Array.isArray(updatedHazards) ? updatedHazards : []);
     } catch (e) {
       toast.error(e.response?.data?.message || "Failed to cleanup hazards");
