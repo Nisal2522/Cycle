@@ -1,11 +1,26 @@
-# tests/performance/artillery-script.yml - Load testing (Requirement vii)
-# Run: npx artillery run tests/performance/artillery-script.yml
 config:
   target: "http://localhost:5000"
   phases:
+    - duration: 10
+      arrivalRate: 2
+      name: "Warm-up"
+    - duration: 20
+      arrivalRate: 2
+      rampTo: 10
+      name: "Ramp-up"
     - duration: 30
-      arrivalRate: 5
+      arrivalRate: 10
       name: "Sustained load"
+    - duration: 10
+      arrivalRate: 20
+      name: "Spike test"
+  ensure:
+    thresholds:
+      - http.response_time.p99: 500
+      - http.response_time.p95: 300
+  defaults:
+    headers:
+      Content-Type: "application/json"
 
 scenarios:
   - name: "Health check"
@@ -14,19 +29,91 @@ scenarios:
           url: "/api/health"
           expect:
             - statusCode: 200
+
   - name: "Public auth stats"
     flow:
       - get:
-          url: "/api/v1/auth/stats"
+          url: "/api/auth/stats"
           expect:
             - statusCode: 200
-            - contentType: json
-  - name: "V1 auth login expect 401"
+
+  - name: "Login with invalid credentials"
     flow:
       - post:
-          url: "/api/v1/auth/login"
+          url: "/api/auth/login"
           json:
-            email: "loadtest@example.com"
-            password: "wrong"
+            email: "nonexistent@example.com"
+            password: "wrongpassword"
           expect:
             - statusCode: 401
+
+  - name: "Browse public routes"
+    flow:
+      - get:
+          url: "/api/routes"
+          expect:
+            - statusCode: 200
+
+  - name: "Browse hazards"
+    flow:
+      - get:
+          url: "/api/hazards"
+          expect:
+            - statusCode: 200
+
+  - name: "Hazard markers"
+    flow:
+      - get:
+          url: "/api/hazards/markers"
+          expect:
+            - statusCode: 200
+
+  - name: "Partner shops list"
+    flow:
+      - get:
+          url: "/api/cyclist/partners"
+          expect:
+            - statusCode: 200
+
+  - name: "Partner count"
+    flow:
+      - get:
+          url: "/api/cyclist/partner-count"
+          expect:
+            - statusCode: 200
+
+  - name: "Auth flow (register, login, profile)"
+    flow:
+      - post:
+          url: "/api/auth/register"
+          json:
+            name: "Artillery User {{ $randomNumber() }}"
+            email: "artillery{{ $randomNumber() }}@test.com"
+            password: "testpass123"
+            role: "cyclist"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 201
+                - 409
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "artillery{{ $randomNumber() }}@test.com"
+            password: "testpass123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+      - get:
+          url: "/api/auth/profile"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode: 200
