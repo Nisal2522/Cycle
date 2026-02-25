@@ -27,6 +27,7 @@ PAYHERE_INTEGRATION.md
 RBAC_AUDIT_SUMMARY.md
 RBAC_GUIDE.md
 frontend/docs/
+backend/docs/
 
 # Vite
 vite.config.js.timestamp-*

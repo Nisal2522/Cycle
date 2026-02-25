@@ -1,6 +1,6 @@
 # CycleLink Backend API
 
-Node.js/Express backend with **Controller → Service → Model architecture**, Mongoose (MongoDB), and JWT auth.
+Node.js/Express backend with **Controller → Service → Model architecture**, Mongoose (MongoDB), JWT auth, and Socket.IO real-time chat.
 
 ---
 
@@ -8,33 +8,100 @@ Node.js/Express backend with **Controller → Service → Model architecture**, 
 
 | Layer          | Location         | Responsibility |
 |----------------|------------------|----------------|
-| **Routes**     | `routes/`        | HTTP routing, auth middleware |
+| **Routes**     | `routes/`        | HTTP routing, auth middleware, Swagger JSDoc |
 | **Controllers**| `controllers/`   | Parse request, validate input, call service, format response |
 | **Services**   | `services/`      | Business logic, orchestration, DB access |
 | **Models**     | `models/`        | Mongoose schemas, DB validation |
-| **Validations**| `validations/`   | Joi schemas for input validation |
-| **Utils**      | `utils/`         | Shared utilities (tokens, formatters) |
+| **Validations**| `validatons/`    | Joi schemas for input validation |
+| **Middleware**  | `middleware/`    | Auth (JWT), role checks, error handler, rate limiter |
+| **Config**     | `config/`        | Database connection, Swagger spec |
+| **Socket**     | `socket/`        | Socket.IO chat events (real-time messaging) |
+| **Interfaces** | `interfaces/`    | Shared type/contract definitions |
+| **Utils**      | `utils/`         | Shared utilities (tokens, formatters, PayHere helpers) |
 
-### API Endpoints (4+)
+---
 
-| Method | Path | Controller | Description |
-|--------|------|-------------|-------------|
-| POST   | `/api/auth/register`   | `authController.registerUser`   | Create account |
-| POST   | `/api/auth/login`      | `authController.loginUser`      | Login, get JWT |
-| POST   | `/api/auth/google`     | `authController.googleLogin`    | Google Sign-In (body: `{ credential }`), returns same JWT shape |
-| GET    | `/api/auth/profile`    | `authController.getProfile`     | Current user profile |
-| GET    | `/api/cyclist/stats`   | `cyclistController.getStats`    | Cyclist dashboard stats |
-| POST   | `/api/cyclist/update-distance` | `cyclistController.updateDistance` | Record ride, update tokens/CO₂ |
-| GET    | `/api/cyclist/leaderboard`     | `cyclistController.getLeaderboard`  | Top 5 cyclists |
-| GET    | `/api/hazards`         | `hazardController.getHazards`   | List active hazards |
-| POST   | `/api/hazards/report`  | `hazardController.reportHazard` | Report new hazard |
-| PATCH  | `/api/hazards/:id`     | `hazardController.updateHazard` | Update hazard (owner) |
-| DELETE | `/api/hazards/:id`     | `hazardController.deleteHazard` | Delete hazard (owner) |
+## API Endpoints
 
-### Mongoose Models
+82+ REST endpoints across 12 domains. Full interactive documentation available via **Swagger UI** at `/api-docs`.
 
-- **User** (`models/User.js`): auth fields, cyclist stats (tokens, totalDistance, co2Saved, totalRides, safetyScore).
-- **Hazard** (`models/Hazard.js`): lat, lng, type, description, reportedBy, active.
+| Domain | Base Path | Endpoints | Description |
+|--------|-----------|-----------|-------------|
+| Auth | `/api/auth` | 7 | Register, login, Google OAuth, profile |
+| Cyclist | `/api/cyclist` | 11 | Rides, stats, leaderboard, partner shops |
+| Partner | `/api/partner` | 13 | Profile, bank details, payouts, earnings |
+| Rewards | `/api/rewards` | 4 | CRUD for partner reward offers |
+| Tokens | `/api/tokens` | 1 | Token redemption |
+| Redeem | `/api/redeem` | 1 | Confirm reward redemption |
+| Hazards | `/api/hazards` | 10 | Report, verify, moderate hazards |
+| Routes | `/api/routes` | 8 | Create, rate, manage cycling routes |
+| Admin | `/api/admin` | 26 | Users, routes, hazards, payouts, payments |
+| Payments | `/api/payments` | 1 | PayHere payment processing |
+| Chat | `/api/chat` | 7 | REST endpoints + Socket.IO real-time messaging |
+| AI | `/api/ai` | 2 | Gemini-powered cycling chatbot |
+
+---
+
+## Mongoose Models
+
+| Model | File | Description |
+|-------|------|-------------|
+| User | `models/User.js` | Auth fields, cyclist stats, partner profile, bank details |
+| Ride | `models/Ride.js` | Cycling rides with distance, duration, tokens earned |
+| Hazard | `models/Hazard.js` | Road hazards with verification system |
+| Route | `models/Route.js` | Cycling routes with ratings and approval workflow |
+| Reward | `models/Reward.js` | Partner reward offers with token cost |
+| Redemption | `models/Redemption.js` | Token redemption transactions |
+| Payment | `models/Payment.js` | PayHere payment records |
+| Payout | `models/Payout.js` | Monthly partner payout calculations |
+| PayoutRequest | `models/PayoutRequest.js` | Partner-initiated payout requests |
+| Chat | `models/Chat.js` | Chat rooms (one-on-one and group) |
+| Message | `models/Message.js` | Chat messages with edit/delete support |
+
+---
+
+## API Documentation
+
+Interactive API docs powered by **Swagger UI** with OpenAPI 3.0.3.
+
+- **URL**: `/api-docs` (available when the server is running)
+- **Source**: Auto-generated from JSDoc annotations in route files via `swagger-jsdoc`
+- **Config**: `src/config/swagger.js`
+
+---
+
+## Testing
+
+**307 tests** across unit, integration, and performance suites.
+
+### Unit Tests — 18 files, 228 tests
+
+Services, validations, and utilities:
+
+- `authService`, `cyclistService`, `partnerService`, `adminService`, `hazardService`, `rewardService`, `routeService`, `transactionService`
+- `authValidation`, `hazardValidation`, `rewardValidation`, `routeValidation`, `rideValidation`, `transactionValidation`, `payoutValidation`
+- `responseFormatter`, `generateToken`, `validateMiddleware`
+
+### Integration Tests — 8 files, 79 tests
+
+HTTP endpoint testing via supertest:
+
+- `auth-endpoints`, `cyclist-endpoints`, `partner-endpoints`, `admin-endpoints`
+- `hazard-endpoints`, `route-endpoints`, `reward-endpoints`, `transaction-endpoints`
+
+### Performance Tests
+
+Artillery.io load and stress testing: `tests/performance/artillery-script.yml`
+
+### npm Scripts
+
+```bash
+npm test                # Run all tests
+npm run test:unit       # Unit tests only
+npm run test:integration # Integration tests only
+npm run test:coverage   # Tests with coverage report
+npm run test:perf       # Artillery performance test
+```
 
 ---
 
@@ -83,12 +150,52 @@ FRONTEND_ORIGIN=http://localhost:5173  # For return_url and cancel_url
 
 ---
 
-## Run
+## Setup & Run
+
+### Install
 
 ```bash
-npm start
+npm install
 ```
 
-Requires `.env` with `MONGO_URI`, `JWT_SECRET`, and optional `PORT`. For Google Sign-In, set `GOOGLE_CLIENT_ID` to your Google OAuth 2.0 Client ID (same as the frontend).
+### Environment Variables
 
-For PayHere integration, see `.env.example` for required PayHere configuration variables.
+Create a `.env` file based on `.env.example`:
+
+```bash
+# Server
+PORT=5000
+NODE_ENV=development
+
+# Database
+MONGO_URI=mongodb://localhost:27017/cyclelink
+
+# JWT
+JWT_SECRET=your_jwt_secret_key_here
+
+# Google OAuth 2.0
+GOOGLE_CLIENT_ID=your_google_client_id_here
+
+# PayHere Payment Gateway
+PAYHERE_MERCHANT_ID=your_merchant_id
+PAYHERE_SECRET=your_merchant_secret
+PAYHERE_BASE_URL=https://sandbox.payhere.lk/pay/checkout
+PAYHERE_SANDBOX=true
+BACKEND_URL=http://localhost:5000
+FRONTEND_ORIGIN=http://localhost:5173
+
+# Cloudinary (image uploads)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Google Gemini AI (chatbot)
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+### Start
+
+```bash
+npm start       # Production
+npm run dev     # Development (nodemon)
+```
